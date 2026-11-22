@@ -1,0 +1,2175 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>SportZal — Трекер тренировок</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --card-border: #334155;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --input-bg: #0f172a;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0;
+      font-family: 'Roboto', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding-bottom: 115px;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(15, 23, 42, 0.94);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+    }
+    .brand h1 {
+      margin: 0;
+      font-family: 'Roboto', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      background: linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .header-actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .icon-btn {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .icon-btn:active { background: var(--accent); }
+    .user-pill {
+      background: rgba(99, 102, 241, 0.18);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      color: #c7d2fe;
+      border-radius: 10px;
+      padding: 6px 9px;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      display: inline-block;
+    }
+
+    /* Home Screen */
+    .home-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - 150px);
+      padding: 24px 16px;
+      max-width: 480px;
+      margin: 0 auto;
+      text-align: center;
+    }
+    .hero-logo {
+      font-family: 'Roboto', sans-serif;
+      font-weight: 700;
+      font-size: 46px;
+      letter-spacing: -0.5px;
+      margin: 0 0 8px;
+      background: linear-gradient(135deg, #ffffff 15%, #818cf8 65%, #34d399 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero-sub {
+      color: var(--muted);
+      font-size: 14px;
+      margin: 0 0 32px;
+    }
+    .home-main-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      width: 100%;
+    }
+    .big-nav-btn {
+      width: 100%;
+      padding: 20px 22px;
+      border-radius: 16px;
+      border: 1px solid var(--card-border);
+      background: var(--card);
+      color: var(--text);
+      font-family: 'Roboto', sans-serif;
+      font-size: 19px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: transform 0.12s, border-color 0.2s, background 0.2s;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    }
+    .big-nav-btn.primary {
+      background: linear-gradient(135deg, #4f46e5, #6366f1);
+      border-color: #818cf8;
+    }
+    .big-nav-btn:active { transform: scale(0.98); }
+    .big-nav-desc {
+      display: block;
+      font-size: 12px;
+      font-weight: 400;
+      color: rgba(248, 250, 252, 0.78);
+      margin-top: 3px;
+      text-align: left;
+    }
+    .home-secondary-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      width: 100%;
+      margin-top: 14px;
+    }
+    .sec-nav-btn {
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid var(--card-border);
+      color: #cbd5e1;
+      border-radius: 12px;
+      padding: 12px 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .sec-nav-btn:active { background: var(--accent); color: #fff; }
+
+    /* Sub-navigation */
+    .sub-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px 4px;
+      max-width: 600px;
+      margin: 0 auto;
+      gap: 8px;
+    }
+    .back-home-btn {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      color: #cbd5e1;
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .day-pills {
+      display: flex;
+      gap: 5px;
+      flex: 1;
+      justify-content: flex-end;
+      overflow-x: auto;
+    }
+    .day-pill {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      color: var(--muted);
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .day-pill.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .container {
+      padding: 10px 14px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .day-banner {
+      background: linear-gradient(135deg, rgba(99,102,241,0.18), rgba(16,185,129,0.08));
+      border: 1px solid rgba(99,102,241,0.35);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .day-banner strong { color: #c7d2fe; }
+
+    .accordion-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .ex-card {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .ex-card.expanded {
+      border-color: rgba(99, 102, 241, 0.7);
+      padding: 14px;
+    }
+    .ex-card.done-today {
+      border-color: rgba(16, 185, 129, 0.55);
+    }
+    .ex-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .ex-card.expanded .ex-header {
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+    .ex-header-left {
+      flex: 1;
+      min-width: 0;
+    }
+    .muscle-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      color: #a5b4fc;
+      background: rgba(99, 102, 241, 0.16);
+      padding: 2px 7px;
+      border-radius: 6px;
+      margin-bottom: 4px;
+    }
+    .ex-title {
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.35;
+      margin: 0;
+    }
+    .ex-card.expanded .ex-title { font-size: 15px; }
+    .ex-collapsed-meta {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .ex-tools {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .header-right-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .chevron {
+      font-size: 12px;
+      color: var(--muted);
+      transition: transform 0.2s;
+      display: inline-block;
+    }
+    .ex-card.expanded .chevron {
+      transform: rotate(180deg);
+      color: #a5b4fc;
+    }
+    .set-counter {
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      color: var(--muted);
+    }
+    .set-counter.has-sets {
+      color: var(--success);
+      border-color: rgba(16, 185, 129, 0.4);
+    }
+    .ex-body {
+      display: none;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(51, 65, 85, 0.6);
+    }
+    .ex-card.expanded .ex-body { display: block; }
+    .mini-actions {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .mini-btn {
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      color: #cbd5e1;
+      border-radius: 7px;
+      padding: 5px 9px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .mini-btn:active { background: var(--accent); color: #fff; }
+
+    .prev-info {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .warmup-box {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px dashed rgba(99, 102, 241, 0.45);
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 10px;
+      font-size: 12px;
+      display: none;
+    }
+    .warmup-box.open { display: block; }
+    .warmup-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+    }
+    .warmup-row:last-child { border-bottom: none; }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .control-box {
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 8px;
+    }
+    .control-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+      margin-bottom: 6px;
+    }
+    .stepper {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 4px;
+    }
+    .step-btn {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .step-btn:active { background: var(--accent); }
+    .num-input {
+      width: 58px;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-size: 17px;
+      font-weight: 700;
+      text-align: center;
+      outline: none;
+    }
+
+    .note-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .note-input {
+      flex: 1;
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+    }
+    .rir-select {
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 8px;
+      color: var(--text);
+      font-size: 12px;
+      outline: none;
+    }
+
+    .log-btn {
+      width: 100%;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: transform 0.1s, background 0.15s;
+    }
+    .log-btn:active { transform: scale(0.98); background: var(--accent-hover); }
+
+    .add-extra-ex-btn {
+      width: 100%;
+      margin-top: 6px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px dashed rgba(16, 185, 129, 0.55);
+      color: #6ee7b7;
+      border-radius: 12px;
+      padding: 14px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .add-extra-ex-btn:active { background: rgba(16, 185, 129, 0.25); }
+
+    .today-sets {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--card-border);
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .set-pill {
+      background: rgba(16, 185, 129, 0.14);
+      color: #6ee7b7;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+
+    /* Floating Rest Timer */
+    .timer-bar {
+      position: fixed;
+      bottom: 12px;
+      left: 12px;
+      right: 12px;
+      max-width: 576px;
+      margin: 0 auto;
+      background: #1e293b;
+      border: 1px solid #475569;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.55);
+      border-radius: 14px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 30;
+    }
+    .timer-bar.running {
+      border-color: var(--accent);
+      background: #1e1b4b;
+    }
+    .timer-bar.finished {
+      border-color: var(--success);
+      background: #064e3b;
+    }
+    .timer-display {
+      font-size: 22px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+    .timer-label {
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .timer-actions {
+      display: flex;
+      gap: 5px;
+    }
+    .t-btn {
+      background: var(--bg);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 7px 9px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .t-btn:active { background: var(--accent); }
+
+    /* Charts & Stats */
+    .stats-mode-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .chart-card {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+    .chart-select {
+      width: 100%;
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .kpi-box {
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 8px;
+      text-align: center;
+    }
+    .kpi-val {
+      font-size: 16px;
+      font-weight: 800;
+      color: #a5b4fc;
+    }
+    .kpi-lbl {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    svg.chart-svg {
+      width: 100%;
+      height: 175px;
+      background: var(--input-bg);
+      border-radius: 10px;
+      border: 1px solid var(--card-border);
+      display: block;
+    }
+
+    .hist-item {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Program Builder Form */
+    .builder-row {
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .field-input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 9px 10px;
+      color: var(--text);
+      font-size: 13px;
+      margin-bottom: 8px;
+      outline: none;
+    }
+    .field-input:focus { border-color: var(--accent); }
+    .field-grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+    }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 14px;
+      z-index: 50;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 18px;
+      width: 100%;
+      max-width: 500px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .modal h2 { margin: 0 0 10px; font-size: 18px; }
+    .modal p { font-size: 13px; color: var(--muted); line-height: 1.45; }
+
+    .backup-card {
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 12px;
+      margin-top: 12px;
+    }
+    .backup-card h3 {
+      margin: 0 0 6px;
+      font-size: 14px;
+      color: #c7d2fe;
+    }
+    .hint-box {
+      display: none;
+      margin-top: 10px;
+      padding: 10px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      border-radius: 8px;
+      font-size: 12px;
+      color: #a7f3d0;
+      line-height: 1.45;
+    }
+    .hint-box.open { display: block; }
+
+    .toast {
+      position: fixed;
+      top: 66px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #10b981;
+      color: #022c22;
+      font-weight: 700;
+      font-size: 13px;
+      padding: 8px 16px;
+      border-radius: 20px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      z-index: 60;
+      text-align: center;
+      max-width: 90%;
+    }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand" onclick="goHome()" title="На главную">
+    <h1>SportZal</h1>
+  </div>
+  <div class="header-actions">
+    <div class="user-pill" onclick="openProfileModal()">
+      <span class="status-dot" id="cloudDot"></span>
+      <span id="userNameLabel">Атлет</span>
+    </div>
+    <button class="icon-btn" onclick="openBuilder()" title="Конструктор программы">✏️ Программа</button>
+  </div>
+</header>
+
+<div id="subNavContainer"></div>
+<div id="mainContainer"></div>
+
+<div class="timer-bar" id="timerBar">
+  <div>
+    <div class="timer-label" id="timerLabel">Таймер отдыха</div>
+    <div class="timer-display" id="timerDisplay">01:30</div>
+  </div>
+  <div class="timer-actions">
+    <button class="t-btn" onclick="startTimer(90)">1:30</button>
+    <button class="t-btn" onclick="startTimer(150)">2:30</button>
+    <button class="t-btn" onclick="startTimer(180)">3:00</button>
+    <button class="t-btn" onclick="stopTimer()">Стоп</button>
+  </div>
+</div>
+
+<div class="toast" id="toast">Готово!</div>
+
+<!-- Add Extra Exercise Modal (during current workout) -->
+<div class="modal-backdrop" id="extraExModal">
+  <div class="modal">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <h2 style="margin:0;">Добавить упражнение</h2>
+      <button class="icon-btn" onclick="closeExtraExModal()">✕</button>
+    </div>
+    <p>Впишите название дополнительного упражнения, которое хотите сделать сегодня:</p>
+    <input type="text" id="extraExName" class="field-input" placeholder="Например: Подъём на носки стоя в тренажёре" />
+    <input type="text" id="extraExMuscle" class="field-input" placeholder="Мышечная группа (необязательно, напр. Икры)" />
+    <div class="field-grid-3" style="margin-bottom:10px;">
+      <div>
+        <div style="font-size:11px; color:var(--muted); margin-bottom:3px;">Подходы</div>
+        <input type="number" id="extraExSets" class="field-input" value="3" min="1" />
+      </div>
+      <div>
+        <div style="font-size:11px; color:var(--muted); margin-bottom:3px;">Повторы</div>
+        <input type="text" id="extraExReps" class="field-input" value="12–15" />
+      </div>
+      <div>
+        <div style="font-size:11px; color:var(--muted); margin-bottom:3px;">Отдых (сек)</div>
+        <input type="number" id="extraExRest" class="field-input" value="90" step="15" />
+      </div>
+    </div>
+    <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); margin-bottom:14px; cursor:pointer;">
+      <input type="checkbox" id="extraExPermanent" />
+      <span>Сохранить в постоянную программу этого дня (иначе — только на сегодняшнюю тренировку)</span>
+    </label>
+    <button class="log-btn" onclick="applyAddExtraExercise()">+ Добавить в текущую тренировку</button>
+  </div>
+</div>
+
+<!-- Swap Exercise Modal (Free text input) -->
+<div class="modal-backdrop" id="swapModal">
+  <div class="modal">
+    <h2>Заменить упражнение</h2>
+    <p id="swapSubtext">Впишите название упражнения на замену:</p>
+    <input type="text" id="swapCustomInput" class="field-input" placeholder="Введите своё название упражнения..." />
+    <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); margin-bottom:12px; cursor:pointer;">
+      <input type="checkbox" id="swapPermanentCheck" />
+      <span>Сохранить замену в постоянную программу (иначе — только на сегодня)</span>
+    </label>
+    <div style="display:flex; gap:8px;">
+      <button class="log-btn" style="flex:1;" onclick="applySwap()">Применить замену</button>
+      <button class="icon-btn" onclick="closeSwapModal()">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<!-- Program Builder Modal (Custom days & free text exercises) -->
+<div class="modal-backdrop" id="builderModal">
+  <div class="modal">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <h2 style="margin:0;">Конструктор программы</h2>
+      <button class="icon-btn" onclick="closeBuilder()">✕</button>
+    </div>
+    <p style="margin-top:0;">Создавайте свои тренировочные дни и вписывайте любые названия упражнений:</p>
+
+    <div id="builderDayTabs" style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;"></div>
+
+    <div style="display:flex; gap:6px; margin-bottom:12px;">
+      <input type="text" id="builderDayNameInput" class="field-input" style="margin-bottom:0; flex:1;" placeholder="Название дня (напр. День 1 или Грудь/Спина)" />
+      <button class="t-btn" style="color:#fca5a5;" onclick="deleteBuilderDay()" title="Удалить этот тренировочный день">🗑 День</button>
+    </div>
+
+    <div id="builderList"></div>
+
+    <button class="t-btn" style="width:100%; margin-bottom:10px; border-color:#6366f1; color:#a5b4fc;" onclick="addBuilderExercise()">+ Добавить упражнение</button>
+    <button class="log-btn" onclick="saveBuilder()">💾 Сохранить программу</button>
+    <div style="text-align:center; margin-top:10px;">
+      <button class="mini-btn" style="color:var(--muted);" onclick="resetProgramDefault()">Сбросить к базовому шаблону</button>
+    </div>
+  </div>
+</div>
+
+<!-- Profile, Excel Export/Email & Database Restore Modal -->
+<div class="modal-backdrop" id="profileModal">
+  <div class="modal">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <h2 style="margin:0;">Аккаунт и база данных</h2>
+      <button class="icon-btn" onclick="closeProfileModal()">✕</button>
+    </div>
+    <p id="profileDetails" style="margin-bottom:8px;">Загрузка профиля...</p>
+
+    <div class="backup-card">
+      <h3>📤 Сохранение и отправка на почту (XLS)</h3>
+      <p style="font-size:12px; margin:0 0 10px;">Сохраните базу тренировок в формате Excel (<code>.xls</code>) на устройство или сразу отправьте файл в почту / «Избранное» Telegram:</p>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <button class="log-btn" style="padding:10px; font-size:12px;" onclick="exportDatabaseXLS(false)">💾 Скачать .XLS</button>
+        <button class="log-btn" style="padding:10px; font-size:12px; background:#059669;" onclick="exportDatabaseXLS(true)">📤 На почту / Поделиться</button>
+      </div>
+      <div id="exportHintBox" class="hint-box"></div>
+    </div>
+
+    <div class="backup-card">
+      <h3>📥 Загрузка сохранённой базы тренировок</h3>
+      <p style="font-size:12px; margin:0 0 10px;">Выберите ранее сохранённый файл базы (<code>.xls</code>, <code>.xlsx</code> или <code>.json</code>), чтобы восстановить свою программу и всю историю подходов:</p>
+      <button class="t-btn" style="width:100%; padding:10px; border-color:#6366f1; color:#a5b4fc;" onclick="triggerImportBackup()">📂 Выбрать файл базы и загрузить</button>
+      <input type="file" id="importFileInput" accept=".xls,.xlsx,.json" style="display:none;" onchange="handleImportBackup(event)" />
+    </div>
+  </div>
+</div>
+
+<script>
+  const DEFAULT_PROGRAM = {
+    A: {
+      name: "Тренировка А",
+      subtitle: "Акцент: Средняя дельта и Трицепс",
+      exercises: [
+        { id: "A1", muscle: "Средние дельты", name: "Махи в стороны на нижнем блоке (или гантелями сидя)", targetSets: 4, targetReps: "12–15", rest: 90, defaultWeight: 10, defaultReps: 12 },
+        { id: "A2", muscle: "Трицепс", name: "Разгибание рук из-за головы на блоке", targetSets: 4, targetReps: "10–15", rest: 90, defaultWeight: 20, defaultReps: 12 },
+        { id: "A3", muscle: "Грудь", name: "Жим гантелей на наклонной скамье (~30°)", targetSets: 3, targetReps: "8–12", rest: 150, defaultWeight: 22, defaultReps: 10 },
+        { id: "A4", muscle: "Спина", name: "Тяга верхнего блока широким хватом", targetSets: 3, targetReps: "8–12", rest: 150, defaultWeight: 50, defaultReps: 10 },
+        { id: "A5", muscle: "Ноги", name: "Гакк-приседания в тренажёре", targetSets: 3, targetReps: "10–12", rest: 180, defaultWeight: 80, defaultReps: 10 },
+        { id: "A6", muscle: "Бицепс", name: "Подъём гантелей на бицепс на наклонной скамье", targetSets: 3, targetReps: "10–12", rest: 90, defaultWeight: 12, defaultReps: 10 }
+      ]
+    },
+    B: {
+      name: "Тренировка Б",
+      subtitle: "Акцент: Бицепс и Задняя дельта",
+      exercises: [
+        { id: "B1", muscle: "Бицепс", name: "Подъём EZ-штанги на бицепс стоя", targetSets: 4, targetReps: "8–12", rest: 90, defaultWeight: 25, defaultReps: 10 },
+        { id: "B2", muscle: "Задние дельты", name: "Обратные разведения гантелей с упором в скамью", targetSets: 4, targetReps: "12–15", rest: 90, defaultWeight: 8, defaultReps: 12 },
+        { id: "B3", muscle: "Спина", name: "Горизонтальная тяга в тренажёре с упором грудью", targetSets: 3, targetReps: "10–12", rest: 150, defaultWeight: 45, defaultReps: 10 },
+        { id: "B4", muscle: "Грудь", name: "Жим в тренажёре на грудь сидя", targetSets: 3, targetReps: "10–12", rest: 150, defaultWeight: 50, defaultReps: 10 },
+        { id: "B5", muscle: "Ноги", name: "Румынская тяга с гантелями или штангой", targetSets: 3, targetReps: "10–12", rest: 180, defaultWeight: 40, defaultReps: 10 },
+        { id: "B6", muscle: "Трицепс", name: "Французский жим лёжа с EZ-грифом", targetSets: 3, targetReps: "10–12", rest: 90, defaultWeight: 20, defaultReps: 10 }
+      ]
+    },
+    C: {
+      name: "Тренировка В",
+      subtitle: "Комплексный удар по Плечам и Рукам",
+      exercises: [
+        { id: "C1", muscle: "Плечи", name: "Жим гантелей или в тренажёре сидя на плечи", targetSets: 3, targetReps: "10–12", rest: 150, defaultWeight: 18, defaultReps: 10 },
+        { id: "C2", muscle: "Средние дельты", name: "Махи гантелями в стороны", targetSets: 4, targetReps: "12–15", rest: 90, defaultWeight: 10, defaultReps: 12 },
+        { id: "C3", muscle: "Бицепс", name: "Сгибания рук на скамье Скотта", targetSets: 3, targetReps: "12–15", rest: 90, defaultWeight: 20, defaultReps: 12 },
+        { id: "C4", muscle: "Трицепс", name: "Разгибание рук на верхнем блоке", targetSets: 3, targetReps: "12–15", rest: 90, defaultWeight: 25, defaultReps: 12 },
+        { id: "C5", muscle: "Спина", name: "Тяга верхнего блока узким нейтральным хватом", targetSets: 3, targetReps: "8–12", rest: 150, defaultWeight: 50, defaultReps: 10 },
+        { id: "C6", muscle: "Ноги", name: "Разгибание ног сидя + Сгибание ног сидя", targetSets: 3, targetReps: "12–15", rest: 90, defaultWeight: 40, defaultReps: 12 }
+      ]
+    }
+  };
+
+  // Telegram WebApp & Account Isolation
+  const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+  let currentUser = { id: "local_athlete", name: "Атлет", isTelegram: false, hasCloud: false };
+
+  function initPlatformUser() {
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      if (tg.setHeaderColor) tg.setHeaderColor("#0f172a");
+      if (tg.setBackgroundColor) tg.setBackgroundColor("#0f172a");
+      const u = tg.initDataUnsafe && tg.initDataUnsafe.user;
+      if (u && u.id) {
+        currentUser = {
+          id: `tg_${u.id}`,
+          name: u.first_name || u.username || `ID ${u.id}`,
+          isTelegram: true,
+          hasCloud: Boolean(tg.CloudStorage && tg.isVersionAtLeast && tg.isVersionAtLeast("6.9"))
+        };
+      }
+    }
+    document.getElementById("userNameLabel").textContent = currentUser.name;
+    document.getElementById("cloudDot").style.background = currentUser.hasCloud ? "#10b981" : "#6366f1";
+  }
+
+  function storageKey(suffix) {
+    return `sportzal_${currentUser.id}_${suffix}`;
+  }
+
+  function syncToTelegramCloud(key, jsonStr) {
+    if (!currentUser.hasCloud) return Promise.resolve(false);
+    return new Promise(resolve => {
+      const CHUNK_SIZE = 3800;
+      const chunks = [];
+      for (let i = 0; i < jsonStr.length; i += CHUNK_SIZE) {
+        chunks.push(jsonStr.slice(i, i + CHUNK_SIZE));
+      }
+      tg.CloudStorage.setItem(`${key}_meta`, JSON.stringify({ count: chunks.length, ts: Date.now() }), (err) => {
+        if (err) return resolve(false);
+        if (!chunks.length) return resolve(true);
+        let done = 0;
+        let failed = false;
+        chunks.forEach((chunk, idx) => {
+          tg.CloudStorage.setItem(`${key}_c${idx}`, chunk, (cErr) => {
+            if (cErr) failed = true;
+            done++;
+            if (done === chunks.length) resolve(!failed);
+          });
+        });
+      });
+    });
+  }
+
+  function loadFromTelegramCloud(key) {
+    if (!currentUser.hasCloud) return Promise.resolve(null);
+    return new Promise(resolve => {
+      tg.CloudStorage.getItem(`${key}_meta`, (err, val) => {
+        if (err || !val) return resolve(null);
+        try {
+          const meta = JSON.parse(val);
+          if (!meta.count) return resolve("[]");
+          const keys = Array.from({ length: meta.count }, (_, i) => `${key}_c${i}`);
+          tg.CloudStorage.getItems(keys, (gErr, values) => {
+            if (gErr || !values) return resolve(null);
+            let full = "";
+            for (let i = 0; i < meta.count; i++) {
+              if (typeof values[`${key}_c${i}`] !== "string") return resolve(null);
+              full += values[`${key}_c${i}`];
+            }
+            resolve(full);
+          });
+        } catch {
+          resolve(null);
+        }
+      });
+    });
+  }
+
+  // App State
+  let currentView = "home";
+  let activeDayKey = "A";
+  let statsSubTab = "charts";
+  let timerInterval = null;
+  let remainingSeconds = 90;
+  let sessionSwaps = {};
+  let sessionExtraExercises = {};
+  let expandedByDay = {};
+  let swapContext = null;
+  let builderDraft = null;
+  let builderDay = "A";
+  let selectedChartEx = "";
+
+  function getTodayISO() {
+    const d = new Date();
+    const offset = d.getTimezoneOffset();
+    const local = new Date(d.getTime() - (offset * 60 * 1000));
+    return local.toISOString().split('T')[0];
+  }
+
+  function getProgram() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey("program")));
+      if (saved && typeof saved === "object" && Object.keys(saved).length > 0) return saved;
+    } catch {}
+    return JSON.parse(JSON.stringify(DEFAULT_PROGRAM));
+  }
+
+  function saveProgram(prog) {
+    const raw = JSON.stringify(prog);
+    localStorage.setItem(storageKey("program"), raw);
+    syncToTelegramCloud("program", raw);
+  }
+
+  function getLogs() {
+    try { return JSON.parse(localStorage.getItem(storageKey("logs")) || "[]"); }
+    catch { return []; }
+  }
+
+  function saveLogs(logs) {
+    const raw = JSON.stringify(logs);
+    localStorage.setItem(storageKey("logs"), raw);
+  }
+
+  function getDayExercises(prog, dayKey) {
+    const base = (prog[dayKey] && Array.isArray(prog[dayKey].exercises)) ? prog[dayKey].exercises : [];
+    const extras = sessionExtraExercises[dayKey] || [];
+    return [...base, ...extras];
+  }
+
+  async function hydrateFromCloud() {
+    if (!currentUser.hasCloud) return;
+    const [cloudProg, cloudLogs] = await Promise.all([
+      loadFromTelegramCloud("program"),
+      loadFromTelegramCloud("logs")
+    ]);
+    let changed = false;
+    if (cloudProg) {
+      try {
+        const parsed = JSON.parse(cloudProg);
+        if (parsed && typeof parsed === "object" && Object.keys(parsed).length > 0) {
+          localStorage.setItem(storageKey("program"), cloudProg);
+          changed = true;
+        }
+      } catch {}
+    }
+    if (cloudLogs) {
+      try {
+        const parsedLogs = JSON.parse(cloudLogs);
+        if (Array.isArray(parsedLogs) && parsedLogs.length >= getLogs().length) {
+          localStorage.setItem(storageKey("logs"), cloudLogs);
+          changed = true;
+        }
+      } catch {}
+    }
+    if (changed) render();
+  }
+
+  function showToast(msg, isWarn = false) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.style.background = isWarn ? "#f59e0b" : "#10b981";
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 2600);
+  }
+
+  // Navigation
+  function goHome() {
+    currentView = "home";
+    render();
+  }
+
+  function openWorkoutView(dayKey) {
+    const prog = getProgram();
+    const keys = Object.keys(prog);
+    if (!keys.length) {
+      showToast("Сначала добавьте хотя бы один день в программе", true);
+      openBuilder();
+      return;
+    }
+    if (dayKey && prog[dayKey]) {
+      activeDayKey = dayKey;
+    } else if (!prog[activeDayKey]) {
+      activeDayKey = keys[0];
+    }
+    currentView = "workout";
+    render();
+  }
+
+  function openStatsView(sub = "charts") {
+    statsSubTab = sub;
+    currentView = "stats";
+    render();
+  }
+
+  function switchWorkoutDay(dayKey) {
+    activeDayKey = dayKey;
+    render();
+  }
+
+  function toggleCard(dayKey, exId) {
+    if (expandedByDay[dayKey] === exId) {
+      expandedByDay[dayKey] = null;
+    } else {
+      expandedByDay[dayKey] = exId;
+    }
+    render();
+  }
+
+  function collapseAll(dayKey) {
+    expandedByDay[dayKey] = "__NONE__";
+    render();
+  }
+
+  function expandAll(dayKey) {
+    expandedByDay[dayKey] = "__ALL__";
+    render();
+  }
+
+  function adjustVal(inputId, delta, min = 0) {
+    const el = document.getElementById(inputId);
+    let val = parseFloat(el.value) || 0;
+    val = Math.max(min, Math.round((val + delta) * 100) / 100);
+    el.value = val;
+    const exId = inputId.split("_")[1];
+    if (document.getElementById(`warm_${exId}`)?.classList.contains("open")) {
+      renderWarmupContent(exId);
+    }
+  }
+
+  function toggleWarmup(exId) {
+    const box = document.getElementById(`warm_${exId}`);
+    if (!box) return;
+    box.classList.toggle("open");
+    if (box.classList.contains("open")) renderWarmupContent(exId);
+  }
+
+  function roundToStep(w, step = 1.25) {
+    return Math.max(step, Math.round(w / step) * step);
+  }
+
+  function renderWarmupContent(exId) {
+    const box = document.getElementById(`warm_${exId}`);
+    const workW = parseFloat(document.getElementById(`w_${exId}`)?.value) || 20;
+    const s1 = roundToStep(workW * 0.45);
+    const s2 = roundToStep(workW * 0.70);
+    const s3 = roundToStep(workW * 0.85);
+    box.innerHTML = `
+      <div style="font-weight:700; color:#a5b4fc; margin-bottom:4px;">🔥 Разминочные подходы (${workW} кг):</div>
+      <div class="warmup-row"><span>1. Лёгкий разогрев (~45%)</span><strong>${s1} кг × 12–15 повт.</strong></div>
+      <div class="warmup-row"><span>2. Подводящий (~70%)</span><strong>${s2} кг × 6–8 повт.</strong></div>
+      <div class="warmup-row"><span>3. Адаптационный (~85%)</span><strong>${s3} кг × 3–4 повт.</strong></div>
+    `;
+  }
+
+  // Add Extra Exercise during Current Workout
+  function openExtraExModal() {
+    document.getElementById("extraExName").value = "";
+    document.getElementById("extraExMuscle").value = "";
+    document.getElementById("extraExSets").value = "3";
+    document.getElementById("extraExReps").value = "12–15";
+    document.getElementById("extraExRest").value = "90";
+    document.getElementById("extraExPermanent").checked = false;
+    document.getElementById("extraExModal").classList.add("open");
+  }
+
+  function closeExtraExModal() {
+    document.getElementById("extraExModal").classList.remove("open");
+  }
+
+  function applyAddExtraExercise() {
+    const name = document.getElementById("extraExName").value.trim();
+    if (!name) {
+      showToast("Введите название упражнения", true);
+      return;
+    }
+    const muscle = document.getElementById("extraExMuscle").value.trim() || "Дополнительно";
+    const targetSets = parseInt(document.getElementById("extraExSets").value, 10) || 3;
+    const targetReps = document.getElementById("extraExReps").value.trim() || "10–12";
+    const rest = parseInt(document.getElementById("extraExRest").value, 10) || 90;
+    const isPerm = document.getElementById("extraExPermanent").checked;
+
+    const newEx = {
+      id: `${activeDayKey}_ex_${Date.now()}`,
+      muscle,
+      name,
+      targetSets,
+      targetReps,
+      rest,
+      defaultWeight: 15,
+      defaultReps: 10
+    };
+
+    if (isPerm) {
+      const prog = getProgram();
+      prog[activeDayKey].exercises.push(newEx);
+      saveProgram(prog);
+      showToast("Упражнение добавлено в программу!");
+    } else {
+      if (!sessionExtraExercises[activeDayKey]) sessionExtraExercises[activeDayKey] = [];
+      sessionExtraExercises[activeDayKey].push({ ...newEx, isExtra: true });
+      showToast("Добавлено в текущую тренировку!");
+    }
+
+    expandedByDay[activeDayKey] = newEx.id;
+    closeExtraExModal();
+    render();
+  }
+
+  // Swap Exercise
+  function openSwapModal(dayKey, exId) {
+    const prog = getProgram();
+    const ex = getDayExercises(prog, dayKey).find(x => x.id === exId);
+    if (!ex) return;
+    swapContext = { dayKey, exId, isExtra: Boolean(ex.isExtra) };
+    document.getElementById("swapSubtext").textContent = `Замена для: «${ex.name}»`;
+    document.getElementById("swapCustomInput").value = sessionSwaps[exId] || ex.name;
+    document.getElementById("swapPermanentCheck").checked = false;
+    document.getElementById("swapModal").classList.add("open");
+  }
+
+  function closeSwapModal() {
+    document.getElementById("swapModal").classList.remove("open");
+    swapContext = null;
+  }
+
+  function applySwap() {
+    if (!swapContext) return;
+    const newName = document.getElementById("swapCustomInput").value.trim();
+    if (!newName) {
+      showToast("Введите название упражнения", true);
+      return;
+    }
+    const perm = document.getElementById("swapPermanentCheck").checked;
+    if (perm && !swapContext.isExtra) {
+      const prog = getProgram();
+      const ex = prog[swapContext.dayKey].exercises.find(x => x.id === swapContext.exId);
+      if (ex) ex.name = newName;
+      saveProgram(prog);
+      delete sessionSwaps[swapContext.exId];
+      showToast("Название обновлено в программе!");
+    } else {
+      sessionSwaps[swapContext.exId] = newName;
+      showToast("Заменено на текущую тренировку!");
+    }
+    expandedByDay[swapContext.dayKey] = swapContext.exId;
+    closeSwapModal();
+    render();
+  }
+
+  // Custom Program Builder
+  function openBuilder() {
+    builderDraft = getProgram();
+    const keys = Object.keys(builderDraft);
+    builderDay = keys.includes(activeDayKey) ? activeDayKey : (keys[0] || "A");
+    renderBuilder();
+    document.getElementById("builderModal").classList.add("open");
+  }
+
+  function closeBuilder() {
+    document.getElementById("builderModal").classList.remove("open");
+  }
+
+  function switchBuilderDay(day) {
+    collectBuilderInputs();
+    builderDay = day;
+    renderBuilder();
+  }
+
+  function addBuilderDay() {
+    collectBuilderInputs();
+    const newKey = `D_${Date.now()}`;
+    const count = Object.keys(builderDraft).length + 1;
+    builderDraft[newKey] = {
+      name: `Тренировка ${count}`,
+      subtitle: "Своя программа тренировок",
+      exercises: [
+        {
+          id: `${newKey}_1`,
+          muscle: "Группа мышц",
+          name: "",
+          targetSets: 3,
+          targetReps: "10–12",
+          rest: 90,
+          defaultWeight: 20,
+          defaultReps: 10
+        }
+      ]
+    };
+    builderDay = newKey;
+    renderBuilder();
+  }
+
+  function deleteBuilderDay() {
+    const keys = Object.keys(builderDraft);
+    if (keys.length <= 1) {
+      showToast("Должен остаться хотя бы один день", true);
+      return;
+    }
+    if (!confirm(`Удалить «${builderDraft[builderDay].name}» целиком?`)) return;
+    delete builderDraft[builderDay];
+    builderDay = Object.keys(builderDraft)[0];
+    renderBuilder();
+  }
+
+  function collectBuilderInputs() {
+    if (!builderDraft || !builderDraft[builderDay]) return;
+    const dayNameEl = document.getElementById("builderDayNameInput");
+    if (dayNameEl && dayNameEl.value.trim()) {
+      builderDraft[builderDay].name = dayNameEl.value.trim();
+    }
+    const list = builderDraft[builderDay].exercises;
+    list.forEach((ex, idx) => {
+      const mEl = document.getElementById(`bm_${idx}`);
+      const nEl = document.getElementById(`bn_${idx}`);
+      const sEl = document.getElementById(`bs_${idx}`);
+      const rEl = document.getElementById(`br_${idx}`);
+      const tEl = document.getElementById(`bt_${idx}`);
+      if (mEl) ex.muscle = mEl.value.trim() || "Упражнение";
+      if (nEl) ex.name = nEl.value.trim();
+      if (sEl) ex.targetSets = parseInt(sEl.value, 10) || 3;
+      if (rEl) ex.targetReps = rEl.value.trim() || "10–12";
+      if (tEl) ex.rest = parseInt(tEl.value, 10) || 90;
+    });
+  }
+
+  function renderBuilder() {
+    const keys = Object.keys(builderDraft);
+    if (!builderDraft[builderDay]) builderDay = keys[0];
+
+    const tabsContainer = document.getElementById("builderDayTabs");
+    tabsContainer.innerHTML = keys.map(k => `
+      <button class="day-pill ${k === builderDay ? 'active' : ''}" onclick="switchBuilderDay('${k}')">
+        ${builderDraft[k].name}
+      </button>
+    `).join("") + `<button class="day-pill" style="border-style:dashed; color:#a5b4fc;" onclick="addBuilderDay()">+ День</button>`;
+
+    document.getElementById("builderDayNameInput").value = builderDraft[builderDay].name;
+
+    const list = builderDraft[builderDay].exercises;
+    const container = document.getElementById("builderList");
+    container.innerHTML = list.map((ex, idx) => `
+      <div class="builder-row">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <strong style="font-size:12px; color:#a5b4fc;">Упражнение #${idx + 1}</strong>
+          <div style="display:flex; gap:4px;">
+            ${idx > 0 ? `<button class="t-btn" style="padding:3px 7px;" onclick="moveBuilderEx(${idx}, -1)" title="Вверх">↑</button>` : ''}
+            ${idx < list.length - 1 ? `<button class="t-btn" style="padding:3px 7px;" onclick="moveBuilderEx(${idx}, 1)" title="Вниз">↓</button>` : ''}
+            <button class="t-btn" style="padding:3px 8px; color:#fca5a5;" onclick="removeBuilderEx(${idx})">Удалить</button>
+          </div>
+        </div>
+        <input type="text" id="bn_${idx}" class="field-input" value="${(ex.name || '').replace(/"/g, '&quot;')}" placeholder="Впишите название упражнения..." />
+        <input type="text" id="bm_${idx}" class="field-input" value="${(ex.muscle || '').replace(/"/g, '&quot;')}" placeholder="Группа мышц (необязательно)" />
+        <div class="field-grid-3">
+          <div>
+            <div style="font-size:10px; color:var(--muted);">Подходы</div>
+            <input type="number" id="bs_${idx}" class="field-input" value="${ex.targetSets}" min="1" />
+          </div>
+          <div>
+            <div style="font-size:10px; color:var(--muted);">Повторы</div>
+            <input type="text" id="br_${idx}" class="field-input" value="${ex.targetReps}" />
+          </div>
+          <div>
+            <div style="font-size:10px; color:var(--muted);">Отдых (сек)</div>
+            <input type="number" id="bt_${idx}" class="field-input" value="${ex.rest}" step="15" />
+          </div>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  function moveBuilderEx(idx, dir) {
+    collectBuilderInputs();
+    const list = builderDraft[builderDay].exercises;
+    const targetIdx = idx + dir;
+    if (targetIdx < 0 || targetIdx >= list.length) return;
+    [list[idx], list[targetIdx]] = [list[targetIdx], list[idx]];
+    renderBuilder();
+  }
+
+  function addBuilderExercise() {
+    collectBuilderInputs();
+    const list = builderDraft[builderDay].exercises;
+    list.push({
+      id: `${builderDay}_${Date.now()}`,
+      muscle: "",
+      name: "",
+      targetSets: 3,
+      targetReps: "10–12",
+      rest: 90,
+      defaultWeight: 15,
+      defaultReps: 10
+    });
+    renderBuilder();
+  }
+
+  function removeBuilderEx(idx) {
+    collectBuilderInputs();
+    builderDraft[builderDay].exercises.splice(idx, 1);
+    renderBuilder();
+  }
+
+  function saveBuilder() {
+    collectBuilderInputs();
+    for (const k of Object.keys(builderDraft)) {
+      builderDraft[k].exercises = builderDraft[k].exercises.filter(e => e.name && e.name.trim() !== "");
+      if (!builderDraft[k].exercises.length) {
+        showToast(`Добавьте хотя бы 1 упражнение в «${builderDraft[k].name}»`, true);
+        return;
+      }
+    }
+    saveProgram(builderDraft);
+    if (!builderDraft[activeDayKey]) activeDayKey = Object.keys(builderDraft)[0];
+    closeBuilder();
+    render();
+    showToast("Программа сохранена!");
+  }
+
+  function resetProgramDefault() {
+    if (!confirm("Вернуть исходную программу А / Б / В?")) return;
+    builderDraft = JSON.parse(JSON.stringify(DEFAULT_PROGRAM));
+    builderDay = "A";
+    saveProgram(builderDraft);
+    renderBuilder();
+    render();
+    showToast("Сброшено к базовой программе");
+  }
+
+  // Profile, XLS Export & Web Share (replaces blocked mailto: inside Telegram WebView)
+  function openProfileModal() {
+    const logs = getLogs();
+    const hintBox = document.getElementById("exportHintBox");
+    if (hintBox) {
+      hintBox.classList.remove("open");
+      hintBox.innerHTML = "";
+    }
+
+    const modeText = currentUser.hasCloud
+      ? `Профиль: <strong>${currentUser.name}</strong> (Telegram ID: <code>${currentUser.id}</code>).<br/>Данные изолированы и привязаны к вашему аккаунту.`
+      : `Профиль: <strong>${currentUser.name}</strong>.<br/>Данные изолированно хранятся в памяти устройства. Вы можете в любой момент выгрузить базу в <code>.xls</code> и отправить себе или на почту.`;
+    document.getElementById("profileDetails").innerHTML = `${modeText}<br/>Всего записано подходов: <strong>${logs.length}</strong>`;
+    document.getElementById("profileModal").classList.add("open");
+  }
+
+  function closeProfileModal() {
+    document.getElementById("profileModal").classList.remove("open");
+  }
+
+  function buildWorkbookBuffer(logs, prog, today) {
+    const wb = XLSX.utils.book_new();
+
+    const journalRows = logs.map(l => ({
+      "Дата": l.date,
+      "Тренировка": l.workout,
+      "Мышца": l.muscle || "",
+      "Упражнение": l.exercise,
+      "Подход": l.set,
+      "Вес (кг)": l.weight,
+      "Повторения": l.reps,
+      "Тоннаж (кг)": Math.round((Number(l.weight) || 0) * (Number(l.reps) || 0) * 100) / 100,
+      "Заметка": l.note || ""
+    }));
+    if (!journalRows.length) {
+      journalRows.push({ "Дата": today, "Тренировка": "", "Мышца": "", "Упражнение": "Нет записей", "Подход": 0, "Вес (кг)": 0, "Повторения": 0, "Тоннаж (кг)": 0, "Заметка": "" });
+    }
+    const wsJournal = XLSX.utils.json_to_sheet(journalRows);
+    XLSX.utils.book_append_sheet(wb, wsJournal, "Журнал тренировок");
+
+    const progRows = [];
+    Object.entries(prog).forEach(([k, day]) => {
+      day.exercises.forEach((ex, i) => {
+        progRows.push({
+          "Код дня": k,
+          "Название дня": day.name,
+          "№": i + 1,
+          "Мышца": ex.muscle || "",
+          "Упражнение": ex.name,
+          "Подходы": ex.targetSets,
+          "Повторения": ex.targetReps,
+          "Отдых (сек)": ex.rest
+        });
+      });
+    });
+    const wsProg = XLSX.utils.json_to_sheet(progRows);
+    XLSX.utils.book_append_sheet(wb, wsProg, "Программа");
+
+    const rawPayload = JSON.stringify({
+      app: "SportZal",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      program: prog,
+      logs: logs
+    });
+    const restoreRows = [["chunk_index", "payload"]];
+    const CHUNK = 25000;
+    for (let i = 0; i < rawPayload.length; i += CHUNK) {
+      restoreRows.push([Math.floor(i / CHUNK), rawPayload.slice(i, i + CHUNK)]);
+    }
+    const wsRestore = XLSX.utils.aoa_to_sheet(restoreRows);
+    XLSX.utils.book_append_sheet(wb, wsRestore, "SportZal_DB");
+
+    return XLSX.write(wb, { bookType: "biff8", type: "array" });
+  }
+
+  async function exportDatabaseXLS(shareMode = false) {
+    const logs = getLogs();
+    const prog = getProgram();
+    const today = getTodayISO();
+    const filename = `SportZal_Base_${today}.xls`;
+    const hintBox = document.getElementById("exportHintBox");
+
+    if (typeof XLSX === "undefined") {
+      const jsonStr = JSON.stringify({ app: "SportZal", program: prog, logs }, null, 2);
+      const blob = new Blob([jsonStr], { type: "application/json" });
+      const jsonName = `SportZal_Base_${today}.json`;
+
+      if (shareMode && navigator.canShare) {
+        const fileObj = new File([blob], jsonName, { type: "application/json" });
+        if (navigator.canShare({ files: [fileObj] })) {
+          try {
+            await navigator.share({ files: [fileObj], title: "SportZal — База тренировок" });
+            return;
+          } catch (e) {}
+        }
+      }
+      triggerBlobDownload(blob, jsonName);
+      showToast("База сохранена в JSON!");
+      return;
+    }
+
+    const xlsBuffer = buildWorkbookBuffer(logs, prog, today);
+    const xlsBlob = new Blob([xlsBuffer], { type: "application/vnd.ms-excel" });
+
+    // Mode 1: Share / Send to Mail (uses native OS Share sheet on mobile, safe download + instructions on PC)
+    if (shareMode) {
+      const fileObj = new File([xlsBlob], filename, { type: "application/vnd.ms-excel" });
+
+      if (navigator.canShare && navigator.canShare({ files: [fileObj] })) {
+        try {
+          await navigator.share({
+            files: [fileObj],
+            title: `SportZal — База тренировок (${today})`,
+            text: `Резервная копия тренировок SportZal от ${today} (подходов: ${logs.length}).`
+          });
+          showToast("Файл передан!");
+          return;
+        } catch (err) {
+          if (err && err.name === "AbortError") return; // User closed share dialog
+        }
+      }
+
+      // Desktop / WebView fallback: download file cleanly without mailto: scheme error
+      triggerBlobDownload(xlsBlob, filename);
+      hintBox.innerHTML = `
+        <strong>✅ Файл <code>${filename}</code> сохранён в папку «Загрузки»!</strong><br/>
+        Встроенный браузер Telegram не позволяет открывать почту напрямую, поэтому прикрепите скачанный файл из папки <strong>«Загрузки»</strong> вручную в письмо или перешлите себе в «Избранное» Telegram.
+      `;
+      hintBox.classList.add("open");
+      showToast("Файл .xls сохранён в «Загрузки»!");
+      return;
+    }
+
+    // Mode 2: Direct download
+    triggerBlobDownload(xlsBlob, filename);
+    hintBox.innerHTML = `<strong>✅ Файл <code>${filename}</code> сохранён в папку «Загрузки».</strong>`;
+    hintBox.classList.add("open");
+    showToast(`Файл ${filename} сохранён!`);
+  }
+
+  function triggerBlobDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  }
+
+  function triggerImportBackup() {
+    document.getElementById("importFileInput").click();
+  }
+
+  function handleImportBackup(ev) {
+    const file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    const ext = file.name.split(".").pop().toLowerCase();
+
+    if (ext === "json") {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          await applyRestoredData(data);
+        } catch {
+          showToast("Ошибка чтения JSON файла", true);
+        }
+      };
+      reader.readAsText(file);
+    } else {
+      if (typeof XLSX === "undefined") {
+        showToast("Для импорта XLS нужен интернет", true);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const dataArr = new Uint8Array(e.target.result);
+          const wb = XLSX.read(dataArr, { type: "array" });
+
+          if (wb.Sheets["SportZal_DB"]) {
+            const rows = XLSX.utils.sheet_to_json(wb.Sheets["SportZal_DB"], { header: 1 });
+            let fullJson = "";
+            for (let i = 1; i < rows.length; i++) {
+              if (rows[i] && typeof rows[i][1] === "string") fullJson += rows[i][1];
+            }
+            const parsed = JSON.parse(fullJson);
+            await applyRestoredData(parsed);
+            return;
+          }
+
+          let restoredLogs = [];
+          if (wb.Sheets["Журнал тренировок"]) {
+            const jRows = XLSX.utils.sheet_to_json(wb.Sheets["Журнал тренировок"]);
+            restoredLogs = jRows
+              .filter(r => r["Упражнение"] && r["Упражнение"] !== "Нет записей")
+              .map((r, idx) => ({
+                uid: `imp_${idx}_${Date.now()}`,
+                date: String(r["Дата"] || getTodayISO()).trim(),
+                workout: String(r["Тренировка"] || "Тренировка").trim(),
+                exId: `IMP_${idx}`,
+                muscle: String(r["Мышца"] || "").trim(),
+                exercise: String(r["Упражнение"]).trim(),
+                set: Number(r["Подход"]) || 1,
+                weight: Number(r["Вес (кг)"]) || 0,
+                reps: Number(r["Повторения"]) || 0,
+                note: String(r["Заметка"] || "").trim(),
+                synced: true
+              }));
+          }
+
+          let restoredProg = null;
+          if (wb.Sheets["Программа"]) {
+            const pRows = XLSX.utils.sheet_to_json(wb.Sheets["Программа"]);
+            if (pRows.length) {
+              restoredProg = {};
+              pRows.forEach((r, idx) => {
+                const code = String(r["Код дня"] || "A").trim();
+                if (!restoredProg[code]) {
+                  restoredProg[code] = {
+                    name: String(r["Название дня"] || `Тренировка ${code}`).trim(),
+                    subtitle: "Загружено из базы",
+                    exercises: []
+                  };
+                }
+                restoredProg[code].exercises.push({
+                  id: `${code}_${idx + 1}`,
+                  muscle: String(r["Мышца"] || "").trim(),
+                  name: String(r["Упражнение"] || "").trim(),
+                  targetSets: Number(r["Подходы"]) || 3,
+                  targetReps: String(r["Повторения"] || "10–12").trim(),
+                  rest: Number(r["Отдых (сек)"]) || 90,
+                  defaultWeight: 20,
+                  defaultReps: 10
+                });
+              });
+            }
+          }
+
+          await applyRestoredData({ program: restoredProg, logs: restoredLogs });
+        } catch (err) {
+          showToast("Не удалось распознать формат файла", true);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+    ev.target.value = "";
+  }
+
+  async function applyRestoredData(data) {
+    if (!data || (!data.program && !Array.isArray(data.logs))) {
+      showToast("Файл не содержит данных SportZal", true);
+      return;
+    }
+    if (data.program && typeof data.program === "object" && Object.keys(data.program).length > 0) {
+      saveProgram(data.program);
+      activeDayKey = Object.keys(data.program)[0];
+    }
+    if (Array.isArray(data.logs)) {
+      saveLogs(data.logs);
+      await syncToTelegramCloud("logs", JSON.stringify(data.logs));
+    }
+    closeProfileModal();
+    render();
+    showToast(`База загружена! Записей: ${(data.logs || []).length}`);
+  }
+
+  // Logging Sets
+  async function logSet(dayKey, exId) {
+    const prog = getProgram();
+    const dayObj = prog[dayKey];
+    const allDayExercises = getDayExercises(prog, dayKey);
+    const ex = allDayExercises.find(item => item.id === exId);
+    if (!ex) return;
+    const activeName = sessionSwaps[exId] || ex.name;
+
+    const weight = parseFloat(document.getElementById(`w_${exId}`).value) || 0;
+    const reps = parseInt(document.getElementById(`r_${exId}`).value, 10) || 0;
+    const rir = document.getElementById(`rir_${exId}`).value;
+    const customNote = document.getElementById(`n_${exId}`).value.trim();
+    const note = [rir, customNote].filter(Boolean).join(" | ");
+
+    const today = getTodayISO();
+    const logs = getLogs();
+    const todayExSets = logs.filter(l => l.date === today && (l.exId === exId || l.exercise === activeName));
+    const setNumber = todayExSets.length + 1;
+
+    const entry = {
+      uid: Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+      date: today,
+      workout: dayObj.name,
+      exId: ex.id,
+      muscle: ex.muscle || "",
+      exercise: activeName,
+      set: setNumber,
+      weight: weight,
+      reps: reps,
+      note: note,
+      synced: !currentUser.hasCloud
+    };
+
+    logs.push(entry);
+    saveLogs(logs);
+    startTimer(ex.rest);
+
+    if (tg && tg.HapticFeedback) {
+      tg.HapticFeedback.notificationOccurred("success");
+    }
+
+    if (expandedByDay[dayKey] !== "__ALL__") {
+      if (setNumber >= ex.targetSets) {
+        const curIdx = allDayExercises.findIndex(item => item.id === exId);
+        const nextEx = allDayExercises[curIdx + 1];
+        expandedByDay[dayKey] = nextEx ? nextEx.id : exId;
+      } else {
+        expandedByDay[dayKey] = exId;
+      }
+    }
+
+    render();
+
+    if (currentUser.hasCloud) {
+      const ok = await syncToTelegramCloud("logs", JSON.stringify(logs));
+      if (ok) {
+        const updated = getLogs();
+        updated.forEach(item => item.synced = true);
+        saveLogs(updated);
+        showToast(`Подход ${setNumber} записан!`);
+      } else {
+        showToast(`Подход ${setNumber} сохранён локально`, true);
+      }
+    } else {
+      showToast(`Подход ${setNumber} записан!`);
+    }
+  }
+
+  async function deleteLog(uid) {
+    const logs = getLogs();
+    const target = logs.find(l => l.uid === uid);
+    if (!target) return;
+    if (!confirm(`Удалить подход (${target.exercise}: ${target.weight} кг × ${target.reps})?`)) return;
+
+    const filtered = logs.filter(l => l.uid !== uid);
+    saveLogs(filtered);
+    render();
+
+    if (currentUser.hasCloud) {
+      await syncToTelegramCloud("logs", JSON.stringify(filtered));
+    }
+    showToast("Запись удалена!");
+  }
+
+  // Timer
+  function formatTime(sec) {
+    const m = String(Math.floor(sec / 60)).padStart(2, "0");
+    const s = String(sec % 60).padStart(2, "0");
+    return `${m}:${s}`;
+  }
+
+  function playBeep() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [0, 0.22, 0.44].forEach(delay => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.25, ctx.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.18);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + 0.18);
+      });
+    } catch (e) {}
+  }
+
+  function startTimer(seconds) {
+    clearInterval(timerInterval);
+    remainingSeconds = seconds;
+    const bar = document.getElementById("timerBar");
+    const label = document.getElementById("timerLabel");
+    const disp = document.getElementById("timerDisplay");
+    bar.className = "timer-bar running";
+    label.textContent = "Отдых между подходами...";
+    disp.textContent = formatTime(remainingSeconds);
+
+    timerInterval = setInterval(() => {
+      remainingSeconds--;
+      if (remainingSeconds <= 0) {
+        clearInterval(timerInterval);
+        disp.textContent = "00:00";
+        label.textContent = "Время вышло — к снаряду!";
+        bar.className = "timer-bar finished";
+        playBeep();
+        if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("warning");
+      } else {
+        disp.textContent = formatTime(remainingSeconds);
+      }
+    }, 1000);
+  }
+
+  function stopTimer() {
+    clearInterval(timerInterval);
+    const bar = document.getElementById("timerBar");
+    bar.className = "timer-bar";
+    document.getElementById("timerLabel").textContent = "Таймер отдыха";
+    document.getElementById("timerDisplay").textContent = "01:30";
+  }
+
+  // Render Statistics
+  function renderStats(logs, prog) {
+    const allExNames = [];
+    Object.keys(prog).forEach(k => {
+      prog[k].exercises.forEach(e => {
+        if (e.name && !allExNames.includes(e.name)) allExNames.push(e.name);
+      });
+    });
+    logs.forEach(l => {
+      if (l.exercise && !allExNames.includes(l.exercise)) allExNames.push(l.exercise);
+    });
+
+    if (!selectedChartEx || !allExNames.includes(selectedChartEx)) {
+      selectedChartEx = allExNames[0] || "";
+    }
+
+    let html = `
+      <div class="stats-mode-tabs">
+        <button class="day-pill ${statsSubTab === 'charts' ? 'active' : ''}" onclick="openStatsView('charts')">📈 Графики прогресса</button>
+        <button class="day-pill ${statsSubTab === 'history' ? 'active' : ''}" onclick="openStatsView('history')">📋 Журнал (${logs.length})</button>
+      </div>
+    `;
+
+    if (statsSubTab === "history") {
+      const rev = [...logs].reverse();
+      if (!rev.length) {
+        html += `<div class="day-banner">Пока нет записанных тренировок. Нажмите «Тренировка» на главном экране, чтобы записать первый подход!</div>`;
+      } else {
+        rev.forEach(item => {
+          html += `
+            <div class="hist-item">
+              <div>
+                <div style="font-size:11px; color:var(--muted);">${item.date} · ${item.workout} · Подход ${item.set}</div>
+                <div style="font-weight:600; margin:2px 0;">${item.exercise}</div>
+                <div style="color:#a5b4fc; font-weight:700;">${item.weight} кг × ${item.reps} повт. <span style="color:var(--muted); font-weight:400;">${item.note ? '(' + item.note + ')' : ''}</span></div>
+              </div>
+              <button class="t-btn" style="padding:5px 9px; color:#fca5a5;" onclick="deleteLog('${item.uid}')">✕</button>
+            </div>
+          `;
+        });
+      }
+      return html;
+    }
+
+    const filtered = logs.filter(l => l.exercise === selectedChartEx);
+    const byDate = {};
+    filtered.forEach(item => {
+      if (!byDate[item.date]) byDate[item.date] = { date: item.date, maxW: 0, tonnage: 0, sets: 0 };
+      byDate[item.date].maxW = Math.max(byDate[item.date].maxW, Number(item.weight) || 0);
+      byDate[item.date].tonnage += (Number(item.weight) || 0) * (Number(item.reps) || 0);
+      byDate[item.date].sets += 1;
+    });
+    const points = Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
+
+    const maxWeightAll = points.length ? Math.max(...points.map(p => p.maxW)) : 0;
+    const totalTonnage = points.reduce((acc, p) => acc + p.tonnage, 0);
+    const totalSets = points.reduce((acc, p) => acc + p.sets, 0);
+
+    function buildSvg(dataPoints, key, color, unit) {
+      if (!dataPoints.length) {
+        return `<div style="padding:28px; text-align:center; color:var(--muted); font-size:13px;">Нет данных для графика. Запишите хотя бы 1 тренировку!</div>`;
+      }
+      const w = 500, h = 160, pad = 26;
+      const vals = dataPoints.map(d => d[key]);
+      const minV = Math.min(...vals) * 0.9;
+      const maxV = Math.max(...vals) * 1.05 || 10;
+      const spanV = (maxV - minV) || 1;
+
+      const coords = dataPoints.map((d, i) => {
+        const x = dataPoints.length === 1 ? w / 2 : pad + (i / (dataPoints.length - 1)) * (w - pad * 2);
+        const y = (h - pad) - ((d[key] - minV) / spanV) * (h - pad * 2);
+        return { x, y, val: d[key], date: d.date.slice(5) };
+      });
+
+      const poly = coords.map(c => `${c.x},${c.y}`).join(" ");
+      const dots = coords.map(c => `
+        <circle cx="${c.x}" cy="${c.y}" r="5" fill="${color}" />
+        <text x="${c.x}" y="${c.y - 10}" fill="#f8fafc" font-size="12" font-weight="bold" text-anchor="middle">${Math.round(c.val * 10) / 10}${unit}</text>
+        <text x="${c.x}" y="${h - 6}" fill="#94a3b8" font-size="11" text-anchor="middle">${c.date}</text>
+      `).join("");
+
+      return `
+        <svg class="chart-svg" viewBox="0 0 ${w} ${h}">
+          ${coords.length > 1 ? `<polyline fill="none" stroke="${color}" stroke-width="3" points="${poly}" />` : ""}
+          ${dots}
+        </svg>
+      `;
+    }
+
+    html += `
+      <div class="chart-card">
+        <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">Выберите упражнение для анализа:</div>
+        <select class="chart-select" onchange="selectedChartEx = this.value; render();">
+          ${allExNames.map(n => `<option value="${n.replace(/"/g, '&quot;')}" ${n === selectedChartEx ? 'selected' : ''}>${n}</option>`).join("")}
+        </select>
+
+        <div class="kpi-grid">
+          <div class="kpi-box"><div class="kpi-val">${maxWeightAll} кг</div><div class="kpi-lbl">Макс. вес</div></div>
+          <div class="kpi-box"><div class="kpi-val">${totalSets}</div><div class="kpi-lbl">Подходов</div></div>
+          <div class="kpi-box"><div class="kpi-val">${Math.round(totalTonnage)} кг</div><div class="kpi-lbl">Тоннаж</div></div>
+        </div>
+
+        <div style="font-size:13px; font-weight:700; margin:10px 0 6px; color:#a5b4fc;">📈 Макс. рабочий вес по тренировкам</div>
+        ${buildSvg(points, "maxW", "#6366f1", "кг")}
+
+        <div style="font-size:13px; font-weight:700; margin:14px 0 6px; color:#6ee7b7;">📊 Рабочий тоннаж за тренировку</div>
+        ${buildSvg(points, "tonnage", "#10b981", "")}
+      </div>
+    `;
+    return html;
+  }
+
+  // Main Render
+  function render() {
+    const subNav = document.getElementById("subNavContainer");
+    const container = document.getElementById("mainContainer");
+    const logs = getLogs();
+    const prog = getProgram();
+    const today = getTodayISO();
+
+    if (currentView === "home") {
+      subNav.innerHTML = "";
+      const todaySetsCount = logs.filter(l => l.date === today).length;
+      container.innerHTML = `
+        <div class="home-screen">
+          <h1 class="hero-logo">SportZal</h1>
+          <p class="hero-sub">Личный дневник силовых тренировок · ${today}</p>
+
+          <div class="home-main-btns">
+            <button class="big-nav-btn primary" onclick="openWorkoutView()">
+              <div>
+                <div>🏋️ Тренировка</div>
+                <span class="big-nav-desc">${todaySetsCount > 0 ? `Сегодня выполнено подходов: ${todaySetsCount}` : 'Начать текущую тренировку'}</span>
+              </div>
+              <span style="font-size:22px;">→</span>
+            </button>
+
+            <button class="big-nav-btn" onclick="openStatsView('charts')">
+              <div>
+                <div>📊 Статистика</div>
+                <span class="big-nav-desc">Графики прогресса весов и история (${logs.length} подх.)</span>
+              </div>
+              <span style="font-size:22px;">→</span>
+            </button>
+          </div>
+
+          <div class="home-secondary-row">
+            <button class="sec-nav-btn" onclick="openBuilder()">✏️ Моя программа</button>
+            <button class="sec-nav-btn" onclick="openProfileModal()">💾 База / Почта (.XLS)</button>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    if (currentView === "stats") {
+      subNav.innerHTML = `
+        <div class="sub-topbar">
+          <button class="back-home-btn" onclick="goHome()">← На главную</button>
+          <span style="font-size:13px; font-weight:700; color:#a5b4fc;">Статистика тренировок</span>
+        </div>
+      `;
+      container.innerHTML = `<div class="container">${renderStats(logs, prog)}</div>`;
+      return;
+    }
+
+    const dayKeys = Object.keys(prog);
+    if (!prog[activeDayKey]) activeDayKey = dayKeys[0];
+
+    subNav.innerHTML = `
+      <div class="sub-topbar">
+        <button class="back-home-btn" onclick="goHome()">← Назад</button>
+        <div class="day-pills">
+          ${dayKeys.map(k => `
+            <button class="day-pill ${k === activeDayKey ? 'active' : ''}" onclick="switchWorkoutDay('${k}')">
+              ${prog[k].name}
+            </button>
+          `).join("")}
+        </div>
+      </div>
+    `;
+
+    const dayData = prog[activeDayKey];
+    const allDayExercises = getDayExercises(prog, activeDayKey);
+
+    if (!expandedByDay[activeDayKey] && allDayExercises.length) {
+      const firstIncomplete = allDayExercises.find(e => {
+        const aName = sessionSwaps[e.id] || e.name;
+        const done = logs.filter(l => l.date === today && (l.exId === e.id || l.exercise === aName)).length;
+        return done < e.targetSets;
+      });
+      expandedByDay[activeDayKey] = firstIncomplete ? firstIncomplete.id : allDayExercises[0].id;
+    }
+
+    let html = `
+      <div class="container">
+        <div class="day-banner">
+          <strong>${dayData.name}</strong> · <span style="color:var(--muted);">${today}</span><br/>
+          <span style="color:var(--muted);">${dayData.subtitle || 'Отмечайте рабочие веса и повторения'}</span>
+        </div>
+        <div class="accordion-toolbar">
+          <span style="font-size:12px; color:var(--muted);">Упражнений: <strong>${allDayExercises.length}</strong></span>
+          <div style="display:flex; gap:6px;">
+            <button class="mini-btn" onclick="expandAll('${activeDayKey}')">Развернуть все</button>
+            <button class="mini-btn" onclick="collapseAll('${activeDayKey}')">Свернуть все</button>
+          </div>
+        </div>
+    `;
+
+    allDayExercises.forEach((ex, idx) => {
+      const activeName = sessionSwaps[ex.id] || ex.name;
+      const isSwapped = Boolean(sessionSwaps[ex.id]);
+      const exHistory = logs.filter(l => l.exId === ex.id || l.exercise === activeName);
+      const lastEntry = exHistory.length ? exHistory[exHistory.length - 1] : null;
+      const todaySets = exHistory.filter(l => l.date === today);
+
+      const currentW = lastEntry ? lastEntry.weight : ex.defaultWeight;
+      const currentR = lastEntry ? lastEntry.reps : ex.defaultReps;
+      const doneClass = todaySets.length >= ex.targetSets ? "done-today" : "";
+      const isExpanded = expandedByDay[activeDayKey] === "__ALL__" || expandedByDay[activeDayKey] === ex.id;
+
+      html += `
+        <div class="ex-card ${doneClass} ${isExpanded ? 'expanded' : ''}">
+          <div class="ex-header" onclick="toggleCard('${activeDayKey}', '${ex.id}')">
+            <div class="ex-header-left">
+              <span class="muscle-badge">${idx + 1}. ${ex.muscle || 'Упражнение'}${isSwapped ? ' · Замена' : ''}${ex.isExtra ? ' · Доп.' : ''}</span>
+              <h3 class="ex-title">${activeName}</h3>
+              ${!isExpanded ? `
+                <div class="ex-collapsed-meta">
+                  План: ${ex.targetSets}×${ex.targetReps} · ${lastEntry ? `Прошлый: ${lastEntry.weight} кг × ${lastEntry.reps}` : `Старт: ${ex.defaultWeight} кг`}
+                </div>
+              ` : ''}
+            </div>
+            <div class="ex-tools">
+              <div class="header-right-row">
+                <div class="set-counter ${todaySets.length ? 'has-sets' : ''}">
+                  ${todaySets.length} / ${ex.targetSets}
+                </div>
+                <span class="chevron">▼</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="ex-body">
+            <div class="mini-actions">
+              <button class="mini-btn" onclick="toggleWarmup('${ex.id}')">🔥 Разминка</button>
+              <button class="mini-btn" onclick="openSwapModal('${activeDayKey}', '${ex.id}')">↻ Заменить</button>
+            </div>
+
+            <div class="prev-info">
+              <span>План: <strong>${ex.targetSets} × ${ex.targetReps}</strong> (отдых ${ex.rest}с)</span>
+              <span>${lastEntry ? `Прошлый: <strong>${lastEntry.weight} кг × ${lastEntry.reps}</strong>` : 'Первый раз'}</span>
+            </div>
+
+            <div class="warmup-box" id="warm_${ex.id}"></div>
+
+            <div class="controls-grid">
+              <div class="control-box">
+                <div class="control-label">Вес (кг)</div>
+                <div class="stepper">
+                  <button class="step-btn" onclick="adjustVal('w_${ex.id}', -1.25, 0)">−</button>
+                  <input type="number" step="0.25" id="w_${ex.id}" class="num-input" value="${currentW}" onchange="if(document.getElementById('warm_${ex.id}').classList.contains('open')) renderWarmupContent('${ex.id}')" />
+                  <button class="step-btn" onclick="adjustVal('w_${ex.id}', 1.25, 0)">+</button>
+                </div>
+              </div>
+              <div class="control-box">
+                <div class="control-label">Повторения</div>
+                <div class="stepper">
+                  <button class="step-btn" onclick="adjustVal('r_${ex.id}', -1, 1)">−</button>
+                  <input type="number" id="r_${ex.id}" class="num-input" value="${currentR}" />
+                  <button class="step-btn" onclick="adjustVal('r_${ex.id}', 1, 1)">+</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="note-row">
+              <select id="rir_${ex.id}" class="rir-select">
+                <option value="Запас 2">Запас 2 повт.</option>
+                <option value="Запас 1">Запас 1 повт.</option>
+                <option value="Отказ">Отказ (0)</option>
+                <option value="Легко">Легко (3+)</option>
+              </select>
+              <input type="text" id="n_${ex.id}" class="note-input" placeholder="Заметка (необязательно)" />
+            </div>
+
+            <button class="log-btn" onclick="logSet('${activeDayKey}', '${ex.id}')">
+              ✓ Записать подход ${todaySets.length + 1} (отдых ${ex.rest}с)
+            </button>
+
+            ${todaySets.length ? `
+              <div class="today-sets">
+                ${todaySets.map(s => `<span class="set-pill">#${s.set}: ${s.weight}кг × ${s.reps}</span>`).join("")}
+              </div>
+            ` : ""}
+          </div>
+        </div>
+      `;
+    });
+
+    html += `
+        <button class="add-extra-ex-btn" onclick="openExtraExModal()">
+          + Добавить дополнительное упражнение
+        </button>
+      </div>
+    `;
+
+    container.innerHTML = html;
+  }
+
+  initPlatformUser();
+  render();
+  hydrateFromCloud();
+</script>
+</body>
+</html>
