@@ -708,6 +708,18 @@
       font-size: 14px;
       color: #c7d2fe;
     }
+    .hint-box {
+      display: none;
+      margin-top: 10px;
+      padding: 10px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      border-radius: 8px;
+      font-size: 12px;
+      color: #a7f3d0;
+      line-height: 1.45;
+    }
+    .hint-box.open { display: block; }
 
     .toast {
       position: fixed;
@@ -849,13 +861,13 @@
     <p id="profileDetails" style="margin-bottom:8px;">Загрузка профиля...</p>
 
     <div class="backup-card">
-      <h3>📤 Сохранение и отправка на почту (XLS / База)</h3>
-      <p style="font-size:12px; margin:0 0 10px;">Скачайте файл базы (включает лист со всеми подходами в формате Excel <code>.xls</code> и лист для полного восстановления) или отправьте на почту:</p>
-      <input type="email" id="backupEmailInput" class="field-input" placeholder="Ваш e-mail (например: name@mail.ru)" />
+      <h3>📤 Сохранение и отправка на почту (XLS)</h3>
+      <p style="font-size:12px; margin:0 0 10px;">Сохраните базу тренировок в формате Excel (<code>.xls</code>) на устройство или сразу отправьте файл в почту / «Избранное» Telegram:</p>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
         <button class="log-btn" style="padding:10px; font-size:12px;" onclick="exportDatabaseXLS(false)">💾 Скачать .XLS</button>
-        <button class="log-btn" style="padding:10px; font-size:12px; background:#059669;" onclick="exportDatabaseXLS(true)">✉️ На почту (.XLS)</button>
+        <button class="log-btn" style="padding:10px; font-size:12px; background:#059669;" onclick="exportDatabaseXLS(true)">📤 На почту / Поделиться</button>
       </div>
+      <div id="exportHintBox" class="hint-box"></div>
     </div>
 
     <div class="backup-card">
@@ -985,9 +997,9 @@
   }
 
   // App State
-  let currentView = "home"; // 'home' | 'workout' | 'stats'
+  let currentView = "home";
   let activeDayKey = "A";
-  let statsSubTab = "charts"; // 'charts' | 'history'
+  let statsSubTab = "charts";
   let timerInterval = null;
   let remainingSeconds = 90;
   let sessionSwaps = {};
@@ -1068,7 +1080,7 @@
     t.textContent = msg;
     t.style.background = isWarn ? "#f59e0b" : "#10b981";
     t.classList.add("show");
-    setTimeout(() => t.classList.remove("show"), 2400);
+    setTimeout(() => t.classList.remove("show"), 2600);
   }
 
   // Navigation
@@ -1214,7 +1226,7 @@
     render();
   }
 
-  // Swap Exercise (Custom text)
+  // Swap Exercise
   function openSwapModal(dayKey, exId) {
     const prog = getProgram();
     const ex = getDayExercises(prog, dayKey).find(x => x.id === exId);
@@ -1255,7 +1267,7 @@
     render();
   }
 
-  // Custom Program Builder (Free text exercises, add/edit/delete days & exercises)
+  // Custom Program Builder
   function openBuilder() {
     builderDraft = getProgram();
     const keys = Object.keys(builderDraft);
@@ -1433,15 +1445,18 @@
     showToast("Сброшено к базовой программе");
   }
 
-  // Profile, XLS Export & Email, Database Import
+  // Profile, XLS Export & Web Share (replaces blocked mailto: inside Telegram WebView)
   function openProfileModal() {
     const logs = getLogs();
-    const savedEmail = localStorage.getItem(storageKey("email")) || "";
-    document.getElementById("backupEmailInput").value = savedEmail;
+    const hintBox = document.getElementById("exportHintBox");
+    if (hintBox) {
+      hintBox.classList.remove("open");
+      hintBox.innerHTML = "";
+    }
 
     const modeText = currentUser.hasCloud
       ? `Профиль: <strong>${currentUser.name}</strong> (Telegram ID: <code>${currentUser.id}</code>).<br/>Данные изолированы и привязаны к вашему аккаунту.`
-      : `Профиль: <strong>${currentUser.name}</strong>.<br/>Данные изолированно хранятся в памяти устройства. Вы можете в любой момент выгрузить базу в <code>.xls</code> и отправить на почту.`;
+      : `Профиль: <strong>${currentUser.name}</strong>.<br/>Данные изолированно хранятся в памяти устройства. Вы можете в любой момент выгрузить базу в <code>.xls</code> и отправить себе или на почту.`;
     document.getElementById("profileDetails").innerHTML = `${modeText}<br/>Всего записано подходов: <strong>${logs.length}</strong>`;
     document.getElementById("profileModal").classList.add("open");
   }
@@ -1450,27 +1465,9 @@
     document.getElementById("profileModal").classList.remove("open");
   }
 
-  function exportDatabaseXLS(sendEmail = false) {
-    const logs = getLogs();
-    const prog = getProgram();
-    const today = getTodayISO();
-    const filename = `SportZal_Base_${today}.xls`;
-
-    if (typeof XLSX === "undefined") {
-      const blob = new Blob([JSON.stringify({ app: "SportZal", program: prog, logs }, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `SportZal_Base_${today}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      showToast("База сохранена в JSON!");
-      return;
-    }
-
+  function buildWorkbookBuffer(logs, prog, today) {
     const wb = XLSX.utils.book_new();
 
-    // Sheet 1: Human-readable Workout Journal
     const journalRows = logs.map(l => ({
       "Дата": l.date,
       "Тренировка": l.workout,
@@ -1488,7 +1485,6 @@
     const wsJournal = XLSX.utils.json_to_sheet(journalRows);
     XLSX.utils.book_append_sheet(wb, wsJournal, "Журнал тренировок");
 
-    // Sheet 2: Program
     const progRows = [];
     Object.entries(prog).forEach(([k, day]) => {
       day.exercises.forEach((ex, i) => {
@@ -1507,7 +1503,6 @@
     const wsProg = XLSX.utils.json_to_sheet(progRows);
     XLSX.utils.book_append_sheet(wb, wsProg, "Программа");
 
-    // Sheet 3: Exact App Restore Payload
     const rawPayload = JSON.stringify({
       app: "SportZal",
       version: 1,
@@ -1523,22 +1518,83 @@
     const wsRestore = XLSX.utils.aoa_to_sheet(restoreRows);
     XLSX.utils.book_append_sheet(wb, wsRestore, "SportZal_DB");
 
-    XLSX.writeFile(wb, filename, { bookType: "biff8" });
+    return XLSX.write(wb, { bookType: "biff8", type: "array" });
+  }
 
-    if (sendEmail) {
-      const email = document.getElementById("backupEmailInput").value.trim();
-      if (email) localStorage.setItem(storageKey("email"), email);
-      const subject = encodeURIComponent(`SportZal — База тренировок (${today})`);
-      const body = encodeURIComponent(
-        `Здравствуйте!\n\nФайл базы тренировок «${filename}» сохранён в загрузки вашего устройства.\nПрикрепите этот файл к данному письму, чтобы сохранить резервную копию.\n\nВсего подходов в базе: ${logs.length}.`
-      );
-      showToast("Файл .xls скачан! Прикрепите его в открывшемся письме.");
-      setTimeout(() => {
-        window.location.href = `mailto:${encodeURIComponent(email)}?subject=${subject}&body=${body}`;
-      }, 600);
-    } else {
-      showToast(`Файл ${filename} сохранён!`);
+  async function exportDatabaseXLS(shareMode = false) {
+    const logs = getLogs();
+    const prog = getProgram();
+    const today = getTodayISO();
+    const filename = `SportZal_Base_${today}.xls`;
+    const hintBox = document.getElementById("exportHintBox");
+
+    if (typeof XLSX === "undefined") {
+      const jsonStr = JSON.stringify({ app: "SportZal", program: prog, logs }, null, 2);
+      const blob = new Blob([jsonStr], { type: "application/json" });
+      const jsonName = `SportZal_Base_${today}.json`;
+
+      if (shareMode && navigator.canShare) {
+        const fileObj = new File([blob], jsonName, { type: "application/json" });
+        if (navigator.canShare({ files: [fileObj] })) {
+          try {
+            await navigator.share({ files: [fileObj], title: "SportZal — База тренировок" });
+            return;
+          } catch (e) {}
+        }
+      }
+      triggerBlobDownload(blob, jsonName);
+      showToast("База сохранена в JSON!");
+      return;
     }
+
+    const xlsBuffer = buildWorkbookBuffer(logs, prog, today);
+    const xlsBlob = new Blob([xlsBuffer], { type: "application/vnd.ms-excel" });
+
+    // Mode 1: Share / Send to Mail (uses native OS Share sheet on mobile, safe download + instructions on PC)
+    if (shareMode) {
+      const fileObj = new File([xlsBlob], filename, { type: "application/vnd.ms-excel" });
+
+      if (navigator.canShare && navigator.canShare({ files: [fileObj] })) {
+        try {
+          await navigator.share({
+            files: [fileObj],
+            title: `SportZal — База тренировок (${today})`,
+            text: `Резервная копия тренировок SportZal от ${today} (подходов: ${logs.length}).`
+          });
+          showToast("Файл передан!");
+          return;
+        } catch (err) {
+          if (err && err.name === "AbortError") return; // User closed share dialog
+        }
+      }
+
+      // Desktop / WebView fallback: download file cleanly without mailto: scheme error
+      triggerBlobDownload(xlsBlob, filename);
+      hintBox.innerHTML = `
+        <strong>✅ Файл <code>${filename}</code> сохранён в папку «Загрузки»!</strong><br/>
+        Встроенный браузер Telegram не позволяет открывать почту напрямую, поэтому прикрепите скачанный файл из папки <strong>«Загрузки»</strong> вручную в письмо или перешлите себе в «Избранное» Telegram.
+      `;
+      hintBox.classList.add("open");
+      showToast("Файл .xls сохранён в «Загрузки»!");
+      return;
+    }
+
+    // Mode 2: Direct download
+    triggerBlobDownload(xlsBlob, filename);
+    hintBox.innerHTML = `<strong>✅ Файл <code>${filename}</code> сохранён в папку «Загрузки».</strong>`;
+    hintBox.classList.add("open");
+    showToast(`Файл ${filename} сохранён!`);
+  }
+
+  function triggerBlobDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
   }
 
   function triggerImportBackup() {
@@ -1802,7 +1858,7 @@
     document.getElementById("timerDisplay").textContent = "01:30";
   }
 
-  // Render Statistics (Charts + History)
+  // Render Statistics
   function renderStats(logs, prog) {
     const allExNames = [];
     Object.keys(prog).forEach(k => {
@@ -1873,250 +1929,4 @@
       const coords = dataPoints.map((d, i) => {
         const x = dataPoints.length === 1 ? w / 2 : pad + (i / (dataPoints.length - 1)) * (w - pad * 2);
         const y = (h - pad) - ((d[key] - minV) / spanV) * (h - pad * 2);
-        return { x, y, val: d[key], date: d.date.slice(5) };
-      });
-
-      const poly = coords.map(c => `${c.x},${c.y}`).join(" ");
-      const dots = coords.map(c => `
-        <circle cx="${c.x}" cy="${c.y}" r="5" fill="${color}" />
-        <text x="${c.x}" y="${c.y - 10}" fill="#f8fafc" font-size="12" font-weight="bold" text-anchor="middle">${Math.round(c.val * 10) / 10}${unit}</text>
-        <text x="${c.x}" y="${h - 6}" fill="#94a3b8" font-size="11" text-anchor="middle">${c.date}</text>
-      `).join("");
-
-      return `
-        <svg class="chart-svg" viewBox="0 0 ${w} ${h}">
-          ${coords.length > 1 ? `<polyline fill="none" stroke="${color}" stroke-width="3" points="${poly}" />` : ""}
-          ${dots}
-        </svg>
-      `;
-    }
-
-    html += `
-      <div class="chart-card">
-        <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">Выберите упражнение для анализа:</div>
-        <select class="chart-select" onchange="selectedChartEx = this.value; render();">
-          ${allExNames.map(n => `<option value="${n.replace(/"/g, '&quot;')}" ${n === selectedChartEx ? 'selected' : ''}>${n}</option>`).join("")}
-        </select>
-
-        <div class="kpi-grid">
-          <div class="kpi-box"><div class="kpi-val">${maxWeightAll} кг</div><div class="kpi-lbl">Макс. вес</div></div>
-          <div class="kpi-box"><div class="kpi-val">${totalSets}</div><div class="kpi-lbl">Подходов</div></div>
-          <div class="kpi-box"><div class="kpi-val">${Math.round(totalTonnage)} кг</div><div class="kpi-lbl">Тоннаж</div></div>
-        </div>
-
-        <div style="font-size:13px; font-weight:700; margin:10px 0 6px; color:#a5b4fc;">📈 Макс. рабочий вес по тренировкам</div>
-        ${buildSvg(points, "maxW", "#6366f1", "кг")}
-
-        <div style="font-size:13px; font-weight:700; margin:14px 0 6px; color:#6ee7b7;">📊 Рабочий тоннаж за тренировку</div>
-        ${buildSvg(points, "tonnage", "#10b981", "")}
-      </div>
-    `;
-    return html;
-  }
-
-  // Main Render
-  function render() {
-    const subNav = document.getElementById("subNavContainer");
-    const container = document.getElementById("mainContainer");
-    const logs = getLogs();
-    const prog = getProgram();
-    const today = getTodayISO();
-
-    // 1. HOME SCREEN (2 main buttons + SportZal Roboto Bold title)
-    if (currentView === "home") {
-      subNav.innerHTML = "";
-      const todaySetsCount = logs.filter(l => l.date === today).length;
-      container.innerHTML = `
-        <div class="home-screen">
-          <h1 class="hero-logo">SportZal</h1>
-          <p class="hero-sub">Личный дневник силовых тренировок · ${today}</p>
-
-          <div class="home-main-btns">
-            <button class="big-nav-btn primary" onclick="openWorkoutView()">
-              <div>
-                <div>🏋️ Тренировка</div>
-                <span class="big-nav-desc">${todaySetsCount > 0 ? `Сегодня выполнено подходов: ${todaySetsCount}` : 'Начать текущую тренировку'}</span>
-              </div>
-              <span style="font-size:22px;">→</span>
-            </button>
-
-            <button class="big-nav-btn" onclick="openStatsView('charts')">
-              <div>
-                <div>📊 Статистика</div>
-                <span class="big-nav-desc">Графики прогресса весов и история (${logs.length} подх.)</span>
-              </div>
-              <span style="font-size:22px;">→</span>
-            </button>
-          </div>
-
-          <div class="home-secondary-row">
-            <button class="sec-nav-btn" onclick="openBuilder()">✏️ Моя программа</button>
-            <button class="sec-nav-btn" onclick="openProfileModal()">💾 База / Почта (.XLS)</button>
-          </div>
-        </div>
-      `;
-      return;
-    }
-
-    // 2. STATS SCREEN
-    if (currentView === "stats") {
-      subNav.innerHTML = `
-        <div class="sub-topbar">
-          <button class="back-home-btn" onclick="goHome()">← На главную</button>
-          <span style="font-size:13px; font-weight:700; color:#a5b4fc;">Статистика тренировок</span>
-        </div>
-      `;
-      container.innerHTML = `<div class="container">${renderStats(logs, prog)}</div>`;
-      return;
-    }
-
-    // 3. WORKOUT SCREEN
-    const dayKeys = Object.keys(prog);
-    if (!prog[activeDayKey]) activeDayKey = dayKeys[0];
-
-    subNav.innerHTML = `
-      <div class="sub-topbar">
-        <button class="back-home-btn" onclick="goHome()">← Назад</button>
-        <div class="day-pills">
-          ${dayKeys.map(k => `
-            <button class="day-pill ${k === activeDayKey ? 'active' : ''}" onclick="switchWorkoutDay('${k}')">
-              ${prog[k].name}
-            </button>
-          `).join("")}
-        </div>
-      </div>
-    `;
-
-    const dayData = prog[activeDayKey];
-    const allDayExercises = getDayExercises(prog, activeDayKey);
-
-    if (!expandedByDay[activeDayKey] && allDayExercises.length) {
-      const firstIncomplete = allDayExercises.find(e => {
-        const aName = sessionSwaps[e.id] || e.name;
-        const done = logs.filter(l => l.date === today && (l.exId === e.id || l.exercise === aName)).length;
-        return done < e.targetSets;
-      });
-      expandedByDay[activeDayKey] = firstIncomplete ? firstIncomplete.id : allDayExercises[0].id;
-    }
-
-    let html = `
-      <div class="container">
-        <div class="day-banner">
-          <strong>${dayData.name}</strong> · <span style="color:var(--muted);">${today}</span><br/>
-          <span style="color:var(--muted);">${dayData.subtitle || 'Отмечайте рабочие веса и повторения'}</span>
-        </div>
-        <div class="accordion-toolbar">
-          <span style="font-size:12px; color:var(--muted);">Упражнений: <strong>${allDayExercises.length}</strong></span>
-          <div style="display:flex; gap:6px;">
-            <button class="mini-btn" onclick="expandAll('${activeDayKey}')">Развернуть все</button>
-            <button class="mini-btn" onclick="collapseAll('${activeDayKey}')">Свернуть все</button>
-          </div>
-        </div>
-    `;
-
-    allDayExercises.forEach((ex, idx) => {
-      const activeName = sessionSwaps[ex.id] || ex.name;
-      const isSwapped = Boolean(sessionSwaps[ex.id]);
-      const exHistory = logs.filter(l => l.exId === ex.id || l.exercise === activeName);
-      const lastEntry = exHistory.length ? exHistory[exHistory.length - 1] : null;
-      const todaySets = exHistory.filter(l => l.date === today);
-
-      const currentW = lastEntry ? lastEntry.weight : ex.defaultWeight;
-      const currentR = lastEntry ? lastEntry.reps : ex.defaultReps;
-      const doneClass = todaySets.length >= ex.targetSets ? "done-today" : "";
-      const isExpanded = expandedByDay[activeDayKey] === "__ALL__" || expandedByDay[activeDayKey] === ex.id;
-
-      html += `
-        <div class="ex-card ${doneClass} ${isExpanded ? 'expanded' : ''}">
-          <div class="ex-header" onclick="toggleCard('${activeDayKey}', '${ex.id}')">
-            <div class="ex-header-left">
-              <span class="muscle-badge">${idx + 1}. ${ex.muscle || 'Упражнение'}${isSwapped ? ' · Замена' : ''}${ex.isExtra ? ' · Доп.' : ''}</span>
-              <h3 class="ex-title">${activeName}</h3>
-              ${!isExpanded ? `
-                <div class="ex-collapsed-meta">
-                  План: ${ex.targetSets}×${ex.targetReps} · ${lastEntry ? `Прошлый: ${lastEntry.weight} кг × ${lastEntry.reps}` : `Старт: ${ex.defaultWeight} кг`}
-                </div>
-              ` : ''}
-            </div>
-            <div class="ex-tools">
-              <div class="header-right-row">
-                <div class="set-counter ${todaySets.length ? 'has-sets' : ''}">
-                  ${todaySets.length} / ${ex.targetSets}
-                </div>
-                <span class="chevron">▼</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="ex-body">
-            <div class="mini-actions">
-              <button class="mini-btn" onclick="toggleWarmup('${ex.id}')">🔥 Разминка</button>
-              <button class="mini-btn" onclick="openSwapModal('${activeDayKey}', '${ex.id}')">↻ Заменить</button>
-            </div>
-
-            <div class="prev-info">
-              <span>План: <strong>${ex.targetSets} × ${ex.targetReps}</strong> (отдых ${ex.rest}с)</span>
-              <span>${lastEntry ? `Прошлый: <strong>${lastEntry.weight} кг × ${lastEntry.reps}</strong>` : 'Первый раз'}</span>
-            </div>
-
-            <div class="warmup-box" id="warm_${ex.id}"></div>
-
-            <div class="controls-grid">
-              <div class="control-box">
-                <div class="control-label">Вес (кг)</div>
-                <div class="stepper">
-                  <button class="step-btn" onclick="adjustVal('w_${ex.id}', -1.25, 0)">−</button>
-                  <input type="number" step="0.25" id="w_${ex.id}" class="num-input" value="${currentW}" onchange="if(document.getElementById('warm_${ex.id}').classList.contains('open')) renderWarmupContent('${ex.id}')" />
-                  <button class="step-btn" onclick="adjustVal('w_${ex.id}', 1.25, 0)">+</button>
-                </div>
-              </div>
-              <div class="control-box">
-                <div class="control-label">Повторения</div>
-                <div class="stepper">
-                  <button class="step-btn" onclick="adjustVal('r_${ex.id}', -1, 1)">−</button>
-                  <input type="number" id="r_${ex.id}" class="num-input" value="${currentR}" />
-                  <button class="step-btn" onclick="adjustVal('r_${ex.id}', 1, 1)">+</button>
-                </div>
-              </div>
-            </div>
-
-            <div class="note-row">
-              <select id="rir_${ex.id}" class="rir-select">
-                <option value="Запас 2">Запас 2 повт.</option>
-                <option value="Запас 1">Запас 1 повт.</option>
-                <option value="Отказ">Отказ (0)</option>
-                <option value="Легко">Легко (3+)</option>
-              </select>
-              <input type="text" id="n_${ex.id}" class="note-input" placeholder="Заметка (необязательно)" />
-            </div>
-
-            <button class="log-btn" onclick="logSet('${activeDayKey}', '${ex.id}')">
-              ✓ Записать подход ${todaySets.length + 1} (отдых ${ex.rest}с)
-            </button>
-
-            ${todaySets.length ? `
-              <div class="today-sets">
-                ${todaySets.map(s => `<span class="set-pill">#${s.set}: ${s.weight}кг × ${s.reps}</span>`).join("")}
-              </div>
-            ` : ""}
-          </div>
-        </div>
-      `;
-    });
-
-    html += `
-        <button class="add-extra-ex-btn" onclick="openExtraExModal()">
-          + Добавить дополнительное упражнение
-        </button>
-      </div>
-    `;
-
-    container.innerHTML = html;
-  }
-
-  initPlatformUser();
-  render();
-  hydrateFromCloud();
-</script>
-</body>
-</html>
+        return { x, y, val: d[key], date: d.date
