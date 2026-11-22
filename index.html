@@ -1901,33 +1901,258 @@
     document.getElementById("timerDisplay").textContent = "01:30";
   }
 
+  // Muscle & Day Taxonomy for Hierarchical Statistics
+  const MUSCLE_TAXONOMY = [
+    { key: "ALL", label: "Все мышцы", subs: [] },
+    {
+      key: "SHOULDERS",
+      label: "Плечи",
+      subs: [
+        { key: "FRONT_DELT", label: "Передние" },
+        { key: "MID_DELT", label: "Средние" },
+        { key: "REAR_DELT", label: "Задние" }
+      ]
+    },
+    {
+      key: "ARMS",
+      label: "Руки",
+      subs: [
+        { key: "BICEPS", label: "Бицепс" },
+        { key: "TRICEPS", label: "Трицепс" }
+      ]
+    },
+    { key: "CHEST", label: "Грудные", subs: [] },
+    { key: "BACK", label: "Спина", subs: [] },
+    { key: "LEGS", label: "Ноги", subs: [] }
+  ];
+
+  const DAY_FILTER_OPTIONS = [
+    { key: "ALL", label: "Все дни" },
+    { key: "MON", label: "Пн (День А)" },
+    { key: "WED", label: "Ср (День Б)" },
+    { key: "FRI", label: "Пт (День В)" }
+  ];
+
+  let statsMuscleGroup = "ALL";
+  let statsSubMuscle = "ALL";
+  let statsDayFilter = "ALL";
+
+  function classifyMuscleTags(muscleStr, exNameStr) {
+    const s = `${muscleStr || ""} ${exNameStr || ""}`.toLowerCase();
+    const groups = new Set();
+    const subs = new Set();
+
+    // Shoulders & Delts
+    if (s.includes("дельт") || s.includes("плеч") || s.includes("махи") || s.includes("отведен") || s.includes("face pull")) {
+      groups.add("SHOULDERS");
+      if (s.includes("передн") || (s.includes("жим") && (s.includes("плеч") || s.includes("дельт") || s.includes("сидя на плечи")))) {
+        subs.add("FRONT_DELT");
+      }
+      if (s.includes("средн") || s.includes("в стороны")) {
+        subs.add("MID_DELT");
+      }
+      if (s.includes("задн") || s.includes("обратн") || s.includes("face pull")) {
+        subs.add("REAR_DELT");
+      }
+    }
+
+    // Arms (Biceps / Triceps)
+    if (s.includes("бицепс") || s.includes("сгибания рук") || s.includes("подъём") && (s.includes("бицепс") || s.includes("штанги") || s.includes("гантелей на бицепс")) || s.includes("скотт") || s.includes("молот")) {
+      groups.add("ARMS");
+      subs.add("BICEPS");
+    }
+    if (s.includes("трицепс") || s.includes("разгибание рук") || s.includes("французск") || s.includes("из-за головы")) {
+      groups.add("ARMS");
+      subs.add("TRICEPS");
+    }
+    if (s.includes("рук")) {
+      groups.add("ARMS");
+    }
+
+    // Chest
+    if (s.includes("груд") || s.includes("жим гантелей на наклонной") || s.includes("жим в тренажёре на грудь") || s.includes("жим штанги лёжа") || s.includes("кроссовер") || s.includes("брусь")) {
+      groups.add("CHEST");
+    }
+
+    // Back
+    if (s.includes("спин") || s.includes("тяга верхнего блока") || s.includes("горизонтальная тяга") || s.includes("подтягиван") || s.includes("широчайш")) {
+      groups.add("BACK");
+    }
+
+    // Legs
+    if (s.includes("ног") || s.includes("гакк") || s.includes("присед") || s.includes("жим ногами") || s.includes("румынск") || s.includes("разгибание ног") || s.includes("сгибание ног") || s.includes("икр") || s.includes("бедр")) {
+      groups.add("LEGS");
+    }
+
+    return { groups, subs };
+  }
+
+  function matchDayFilter(item, prog, dayFilter) {
+    if (dayFilter === "ALL") return true;
+    const w = (item.workout || "").toLowerCase();
+    const exId = (item.exId || "").toUpperCase();
+
+    // Check by workout name or program day key (A=Пн, B=Ср, C=Пт)
+    if (dayFilter === "MON") {
+      if (exId.startsWith("A") || w.includes("тренировка а") || w.includes("день а") || w.includes("пн") || w.includes("понедельник")) return true;
+      if (prog.A && (w === prog.A.name.toLowerCase() || prog.A.exercises.some(e => e.name === item.exercise))) return true;
+    }
+    if (dayFilter === "WED") {
+      if (exId.startsWith("B") || w.includes("тренировка б") || w.includes("день б") || w.includes("ср") || w.includes("среда")) return true;
+      if (prog.B && (w === prog.B.name.toLowerCase() || prog.B.exercises.some(e => e.name === item.exercise))) return true;
+    }
+    if (dayFilter === "FRI") {
+      if (exId.startsWith("C") || w.includes("тренировка в") || w.includes("день в") || w.includes("пт") || w.includes("пятница")) return true;
+      if (prog.C && (w === prog.C.name.toLowerCase() || prog.C.exercises.some(e => e.name === item.exercise))) return true;
+    }
+
+    // Fallback: check actual calendar weekday of item.date (1=Mon, 3=Wed, 5=Fri)
+    if (item.date) {
+      const parts = item.date.split("-");
+      if (parts.length === 3) {
+        const dt = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        const dow = dt.getDay();
+        if (dayFilter === "MON" && dow === 1) return true;
+        if (dayFilter === "WED" && dow === 3) return true;
+        if (dayFilter === "FRI" && dow === 5) return true;
+      }
+    }
+    return false;
+  }
+
+  function setStatsMuscleGroup(groupKey) {
+    statsMuscleGroup = groupKey;
+    statsSubMuscle = "ALL";
+    selectedChartEx = "";
+    render();
+  }
+
+  function setStatsSubMuscle(subKey) {
+    statsSubMuscle = subKey;
+    selectedChartEx = "";
+    render();
+  }
+
+  function setStatsDayFilter(dayKey) {
+    statsDayFilter = dayKey;
+    selectedChartEx = "";
+    render();
+  }
+
   // Render Statistics
   function renderStats(logs, prog) {
-    const allExNames = [];
-    Object.keys(prog).forEach(k => {
-      prog[k].exercises.forEach(e => {
-        if (e.name && !allExNames.includes(e.name)) allExNames.push(e.name);
+    // Build exercise catalog from both program and logs with muscle & day metadata
+    const exCatalogMap = new Map();
+    Object.entries(prog).forEach(([dKey, dayObj]) => {
+      (dayObj.exercises || []).forEach(e => {
+        if (!e.name) return;
+        const tags = classifyMuscleTags(e.muscle, e.name);
+        exCatalogMap.set(e.name, {
+          name: e.name,
+          muscle: e.muscle || "",
+          dayKey: dKey,
+          groups: tags.groups,
+          subs: tags.subs
+        });
       });
     });
+
     logs.forEach(l => {
-      if (l.exercise && !allExNames.includes(l.exercise)) allExNames.push(l.exercise);
+      if (!l.exercise) return;
+      const tags = classifyMuscleTags(l.muscle, l.exercise);
+      if (!exCatalogMap.has(l.exercise)) {
+        exCatalogMap.set(l.exercise, {
+          name: l.exercise,
+          muscle: l.muscle || "",
+          dayKey: (l.exId || "").charAt(0) || "",
+          groups: tags.groups,
+          subs: tags.subs
+        });
+      } else {
+        const existing = exCatalogMap.get(l.exercise);
+        tags.groups.forEach(g => existing.groups.add(g));
+        tags.subs.forEach(sb => existing.subs.add(sb));
+      }
     });
 
-    if (!selectedChartEx || !allExNames.includes(selectedChartEx)) {
-      selectedChartEx = allExNames[0] || "";
+    // Filter logs by Muscle Group -> Sub-muscle -> Day of week
+    const filteredLogsByFilters = logs.filter(item => {
+      const tags = classifyMuscleTags(item.muscle, item.exercise);
+      if (statsMuscleGroup !== "ALL" && !tags.groups.has(statsMuscleGroup)) return false;
+      if (statsSubMuscle !== "ALL" && !tags.subs.has(statsSubMuscle)) return false;
+      if (!matchDayFilter(item, prog, statsDayFilter)) return false;
+      return true;
+    });
+
+    // Filter exercise dropdown list by the same Muscle Group -> Sub-muscle -> Day of week
+    const filteredExercises = Array.from(exCatalogMap.values()).filter(ex => {
+      if (statsMuscleGroup !== "ALL" && !ex.groups.has(statsMuscleGroup)) return false;
+      if (statsSubMuscle !== "ALL" && !ex.subs.has(statsSubMuscle)) return false;
+      if (statsDayFilter !== "ALL") {
+        const fakeItem = { workout: "", exId: ex.dayKey, exercise: ex.name, date: "" };
+        if (!matchDayFilter(fakeItem, prog, statsDayFilter)) return false;
+      }
+      return true;
+    });
+
+    // Prioritize exercises that actually have logged sets
+    const loggedExSet = new Set(filteredLogsByFilters.map(l => l.exercise));
+    filteredExercises.sort((a, b) => {
+      const aHas = loggedExSet.has(a.name) ? 1 : 0;
+      const bHas = loggedExSet.has(b.name) ? 1 : 0;
+      return bHas - aHas;
+    });
+
+    const exNamesList = filteredExercises.map(e => e.name);
+    if (!selectedChartEx || !exNamesList.includes(selectedChartEx)) {
+      selectedChartEx = exNamesList[0] || "";
     }
+
+    const activeGroupObj = MUSCLE_TAXONOMY.find(m => m.key === statsMuscleGroup) || MUSCLE_TAXONOMY[0];
 
     let html = `
       <div class="stats-mode-tabs">
         <button class="day-pill ${statsSubTab === 'charts' ? 'active' : ''}" onclick="openStatsView('charts')">📈 Графики прогресса</button>
-        <button class="day-pill ${statsSubTab === 'history' ? 'active' : ''}" onclick="openStatsView('history')">📋 Журнал (${logs.length})</button>
+        <button class="day-pill ${statsSubTab === 'history' ? 'active' : ''}" onclick="openStatsView('history')">📋 Журнал (${filteredLogsByFilters.length})</button>
+      </div>
+
+      <div class="chart-card" style="padding:12px; margin-bottom:12px;">
+        <div style="font-size:11px; color:var(--muted); margin-bottom:6px; font-weight:600;">1. Мышечная группа:</div>
+        <div style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:${activeGroupObj.subs.length ? '10px' : '10px'};">
+          ${MUSCLE_TAXONOMY.map(m => `
+            <button class="day-pill ${statsMuscleGroup === m.key ? 'active' : ''}" style="padding:6px 10px; font-size:12px;" onclick="setStatsMuscleGroup('${m.key}')">
+              ${m.label}
+            </button>
+          `).join("")}
+        </div>
+
+        ${activeGroupObj.subs.length ? `
+          <div style="font-size:11px; color:#a5b4fc; margin-bottom:6px; font-weight:600;">Пучок / отдел (${activeGroupObj.label}):</div>
+          <div style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:10px; padding-left:6px; border-left:2px solid var(--accent);">
+            <button class="day-pill ${statsSubMuscle === 'ALL' ? 'active' : ''}" style="padding:5px 9px; font-size:11px;" onclick="setStatsSubMuscle('ALL')">Все (${activeGroupObj.label.toLowerCase()})</button>
+            ${activeGroupObj.subs.map(sb => `
+              <button class="day-pill ${statsSubMuscle === sb.key ? 'active' : ''}" style="padding:5px 9px; font-size:11px;" onclick="setStatsSubMuscle('${sb.key}')">
+                ${sb.label}
+              </button>
+            `).join("")}
+          </div>
+        ` : ""}
+
+        <div style="font-size:11px; color:var(--muted); margin-bottom:6px; font-weight:600;">2. День программы:</div>
+        <div style="display:flex; flex-wrap:wrap; gap:5px;">
+          ${DAY_FILTER_OPTIONS.map(d => `
+            <button class="day-pill ${statsDayFilter === d.key ? 'active' : ''}" style="padding:6px 10px; font-size:12px;" onclick="setStatsDayFilter('${d.key}')">
+              ${d.label}
+            </button>
+          `).join("")}
+        </div>
       </div>
     `;
 
     if (statsSubTab === "history") {
-      const rev = [...logs].reverse();
+      const rev = [...filteredLogsByFilters].reverse();
       if (!rev.length) {
-        html += `<div class="day-banner">Пока нет записанных тренировок. Нажмите «Тренировка» на главном экране, чтобы записать первый подход!</div>`;
+        html += `<div class="day-banner">По выбранным фильтрам записей пока нет. Попробуйте выбрать «Все мышцы» или «Все дни».</div>`;
       } else {
         rev.forEach(item => {
           html += `
@@ -1945,7 +2170,12 @@
       return html;
     }
 
-    const filtered = logs.filter(l => l.exercise === selectedChartEx);
+    // Group summary KPIs for selected Muscle + Day filter
+    const groupTotalSets = filteredLogsByFilters.length;
+    const groupTotalTonnage = filteredLogsByFilters.reduce((acc, item) => acc + (Number(item.weight) || 0) * (Number(item.reps) || 0), 0);
+    const groupMaxWeight = filteredLogsByFilters.length ? Math.max(...filteredLogsByFilters.map(item => Number(item.weight) || 0)) : 0;
+
+    const filtered = filteredLogsByFilters.filter(l => l.exercise === selectedChartEx);
     const byDate = {};
     filtered.forEach(item => {
       if (!byDate[item.date]) byDate[item.date] = { date: item.date, maxW: 0, tonnage: 0, sets: 0 };
@@ -1961,7 +2191,7 @@
 
     function buildSvg(dataPoints, key, color, unit) {
       if (!dataPoints.length) {
-        return `<div style="padding:28px; text-align:center; color:var(--muted); font-size:13px;">Нет данных для графика. Запишите хотя бы 1 тренировку!</div>`;
+        return `<div style="padding:28px; text-align:center; color:var(--muted); font-size:13px;">Нет данных по этому упражнению. Выберите другое упражнение из списка выше!</div>`;
       }
       const w = 500, h = 160, pad = 26;
       const vals = dataPoints.map(d => d[key]);
@@ -1992,22 +2222,40 @@
 
     html += `
       <div class="chart-card">
-        <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">Выберите упражнение для анализа:</div>
-        <select class="chart-select" onchange="selectedChartEx = this.value; render();">
-          ${allExNames.map(n => `<option value="${n.replace(/"/g, '&quot;')}" ${n === selectedChartEx ? 'selected' : ''}>${n}</option>`).join("")}
-        </select>
-
-        <div class="kpi-grid">
-          <div class="kpi-box"><div class="kpi-val">${maxWeightAll} кг</div><div class="kpi-lbl">Макс. вес</div></div>
-          <div class="kpi-box"><div class="kpi-val">${totalSets}</div><div class="kpi-lbl">Подходов</div></div>
-          <div class="kpi-box"><div class="kpi-val">${Math.round(totalTonnage)} кг</div><div class="kpi-lbl">Тоннаж</div></div>
+        <div style="font-size:12px; font-weight:700; color:#c7d2fe; margin-bottom:8px;">
+          Сводка по фильтру (${activeGroupObj.label}${statsSubMuscle !== 'ALL' ? ' · ' + (activeGroupObj.subs.find(s => s.key === statsSubMuscle)?.label || '') : ''}${statsDayFilter !== 'ALL' ? ' · ' + (DAY_FILTER_OPTIONS.find(d => d.key === statsDayFilter)?.label || '') : ''}):
+        </div>
+        <div class="kpi-grid" style="margin-bottom:14px;">
+          <div class="kpi-box"><div class="kpi-val" style="color:#6ee7b7;">${groupMaxWeight} кг</div><div class="kpi-lbl">Пик. вес</div></div>
+          <div class="kpi-box"><div class="kpi-val" style="color:#6ee7b7;">${groupTotalSets}</div><div class="kpi-lbl">Всего подходов</div></div>
+          <div class="kpi-box"><div class="kpi-val" style="color:#6ee7b7;">${Math.round(groupTotalTonnage)} кг</div><div class="kpi-lbl">Общий тоннаж</div></div>
         </div>
 
-        <div style="font-size:13px; font-weight:700; margin:10px 0 6px; color:#a5b4fc;">📈 Макс. рабочий вес по тренировкам</div>
-        ${buildSvg(points, "maxW", "#6366f1", "кг")}
+        <div style="border-top:1px solid var(--card-border); padding-top:12px;">
+          <div style="font-size:11px; color:var(--muted); margin-bottom:6px; font-weight:600;">3. Конкретное упражнение из базы (${exNamesList.length}):</div>
+          ${exNamesList.length ? `
+            <select class="chart-select" onchange="selectedChartEx = this.value; render();">
+              ${exNamesList.map(n => {
+                const cnt = filteredLogsByFilters.filter(l => l.exercise === n).length;
+                return `<option value="${n.replace(/"/g, '&quot;')}" ${n === selectedChartEx ? 'selected' : ''}>${n} (${cnt} подх.)</option>`;
+              }).join("")}
+            </select>
 
-        <div style="font-size:13px; font-weight:700; margin:14px 0 6px; color:#6ee7b7;">📊 Рабочий тоннаж за тренировку</div>
-        ${buildSvg(points, "tonnage", "#10b981", "")}
+            <div class="kpi-grid">
+              <div class="kpi-box"><div class="kpi-val">${maxWeightAll} кг</div><div class="kpi-lbl">Макс. вес (упр.)</div></div>
+              <div class="kpi-box"><div class="kpi-val">${totalSets}</div><div class="kpi-lbl">Подходов (упр.)</div></div>
+              <div class="kpi-box"><div class="kpi-val">${Math.round(totalTonnage)} кг</div><div class="kpi-lbl">Тоннаж (упр.)</div></div>
+            </div>
+
+            <div style="font-size:13px; font-weight:700; margin:10px 0 6px; color:#a5b4fc;">📈 Макс. рабочий вес по тренировкам</div>
+            ${buildSvg(points, "maxW", "#6366f1", "кг")}
+
+            <div style="font-size:13px; font-weight:700; margin:14px 0 6px; color:#6ee7b7;">📊 Рабочий тоннаж за тренировку</div>
+            ${buildSvg(points, "tonnage", "#10b981", "")}
+          ` : `
+            <div style="padding:16px; text-align:center; color:var(--muted); font-size:13px;">Нет упражнений под выбранную комбинацию мышц и дня недели.</div>
+          `}
+        </div>
       </div>
     `;
     return html;
