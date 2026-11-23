@@ -1231,8 +1231,9 @@
       } catch {}
     });
 
-    if (added > 0) {
-      localStorage.setItem(targetKey, JSON.stringify(existingTarget));
+    const dedupedTarget = deduplicateLogsList(existingTarget);
+    if (added > 0 || dedupedTarget.length !== existingTarget.length) {
+      localStorage.setItem(targetKey, JSON.stringify(dedupedTarget));
     }
   }
 
@@ -1458,7 +1459,7 @@
           }
         });
 
-        const mergedList = Array.from(mergedMap.values());
+        const mergedList = deduplicateLogsList(Array.from(mergedMap.values()));
         localStorage.setItem(storageKey("logs"), JSON.stringify(mergedList));
       }
 
@@ -1477,7 +1478,8 @@
         return { ok: false, error: `Программа (${upProgRes.status}): ${errTxt.slice(0, 80)}`, count: getLogs().length };
       }
 
-      const localLogs = getLogs();
+      const localLogs = deduplicateLogsList(getLogs());
+      localStorage.setItem(storageKey("logs"), JSON.stringify(localLogs));
       if (localLogs.length > 0) {
         const payload = localLogs.map(l => ({
           uid: l.uid,
@@ -1585,6 +1587,61 @@
     const offset = d.getTimezoneOffset();
     const local = new Date(d.getTime() - (offset * 60 * 1000));
     return local.toISOString().split('T')[0];
+  }
+
+  function getCurrentTimeHM(dateObj = new Date()) {
+    const hh = String(dateObj.getHours()).padStart(2, "0");
+    const mm = String(dateObj.getMinutes()).padStart(2, "0");
+    return `${hh}:${mm}`;
+  }
+
+  function extractTimeFromRecord(rec) {
+    if (rec && typeof rec.time === "string" && rec.time.trim()) {
+      return rec.time.trim();
+    }
+    if (rec && typeof rec.created_at === "string" && rec.created_at.includes("T")) {
+      const dt = new Date(rec.created_at);
+      if (!Number.isNaN(dt.getTime())) return getCurrentTimeHM(dt);
+    }
+    if (rec && typeof rec.uid === "string") {
+      const tsPart = rec.uid.split("_")[0];
+      const tsNum = Number(tsPart);
+      if (Number.isFinite(tsNum) && tsNum > 1600000000000 && tsNum < 4100000000000) {
+        return getCurrentTimeHM(new Date(tsNum));
+      }
+    }
+    return "";
+  }
+
+  function buildSemanticLogKey(l) {
+    return [
+      String(l.date || "").trim(),
+      String(l.workout || "").trim().toLowerCase(),
+      String(l.exercise || "").trim().toLowerCase(),
+      Number(l.set) || 1,
+      Number(l.weight) || 0,
+      Number(l.reps) || 0
+    ].join("|");
+  }
+
+  function deduplicateLogsList(list) {
+    const seenUids = new Set();
+    const seenSemantic = new Set();
+    const result = [];
+    (Array.isArray(list) ? list : []).forEach(item => {
+      if (!item || !item.exercise) return;
+      const uid = item.uid ? String(item.uid) : "";
+      if (uid && seenUids.has(uid)) return;
+      const semKey = buildSemanticLogKey(item);
+      if (seenSemantic.has(semKey)) return;
+      if (uid) seenUids.add(uid);
+      seenSemantic.add(semKey);
+      result.push({
+        ...item,
+        time: extractTimeFromRecord(item)
+      });
+    });
+    return result;
   }
 
   function formatDurationHMS(totalSec) {
@@ -2536,6 +2593,7 @@
     const entry = {
       uid: Date.now() + "_" + Math.random().toString(36).slice(2, 6),
       date: today,
+      time: getCurrentTimeHM(),
       workout: dayObj.name,
       exId: ex.id,
       muscle: ex.muscle || "",
@@ -3021,7 +3079,7 @@
           html += `
             <div class="hist-item">
               <div>
-                <div style="font-size:11px; color:var(--muted);">${item.date} · ${item.workout} · Подход ${item.set}</div>
+                <div style="font-size:11px; color:var(--muted);">${item.date}${extractTimeFromRecord(item) ? ' · ' + extractTimeFromRecord(item) : ''} · ${item.workout} · Подход ${item.set}</div>
                 <div style="font-weight:600; margin:2px 0;">${item.exercise}</div>
                 <div style="color:#a5b4fc; font-weight:700;">${item.weight} кг × ${item.reps} повт. <span style="color:var(--muted); font-weight:400;">${item.note ? '(' + item.note + ')' : ''}</span></div>
               </div>
