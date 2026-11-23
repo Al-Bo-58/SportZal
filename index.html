@@ -1596,8 +1596,13 @@
           });
         }
 
+        // Only keep local rows that were never synced yet (created offline/unpushed) and not deleted.
+        // Rows that were already synced (`synced === true`) and are missing from `rRows` were deleted on another device!
         existingLocal.forEach(l => {
-          if (l && l.uid && !mergedMap.has(l.uid)) {
+          if (!l || !l.uid || mergedMap.has(l.uid)) return;
+          const sem = buildSemanticLogKey(l);
+          if (ignoredDeleted.has(l.uid) || ignoredSem.has(sem)) return;
+          if (l.synced === false) {
             mergedMap.set(l.uid, { ...l, synced: false });
           }
         });
@@ -2771,7 +2776,7 @@
       weight: weight,
       reps: reps,
       note: note,
-      synced: !currentUser.hasCloud
+      synced: false
     };
 
     logs.push(entry);
