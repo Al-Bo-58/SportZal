@@ -118,7 +118,6 @@
       display: inline-block;
     }
 
-    /* Home Screen */
     .home-screen {
       display: flex;
       flex-direction: column;
@@ -203,7 +202,6 @@
     }
     .sec-nav-btn:active { background: var(--accent); color: #fff; }
 
-    /* Sub-navigation */
     .sub-topbar {
       display: flex;
       align-items: center;
@@ -213,18 +211,6 @@
       margin: 0 auto;
       gap: 8px;
       flex-wrap: nowrap;
-    }
-    .back-home-btn {
-      background: var(--card);
-      border: 1px solid var(--card-border);
-      color: #f3f2f2;
-      border-radius: 10px;
-      padding: 8px 10px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
-      flex-shrink: 0;
     }
     .day-pills {
       display: flex;
@@ -610,7 +596,6 @@
       font-weight: 600;
     }
 
-    /* Floating Rest Timer */
     .timer-bar {
       position: fixed;
       bottom: calc(12px + env(safe-area-inset-bottom, 0px));
@@ -662,7 +647,6 @@
     }
     .t-btn:active { background: var(--accent); }
 
-    /* Charts & Stats */
     .stats-mode-tabs {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -731,7 +715,6 @@
       gap: 8px;
     }
 
-    /* AI Local Coach */
     .coach-q-btn {
       background: var(--input-bg);
       border: 1px solid var(--card-border);
@@ -758,7 +741,6 @@
       white-space: pre-line;
     }
 
-    /* Program Builder Form */
     .builder-row {
       background: var(--input-bg);
       border: 1px solid var(--card-border);
@@ -784,7 +766,6 @@
       gap: 6px;
     }
 
-    /* Modal */
     .modal-backdrop {
       position: fixed;
       inset: 0;
@@ -892,7 +873,6 @@
 
 <div class="toast" id="toast">Готово!</div>
 
-<!-- Add Extra Exercise Modal -->
 <div class="modal-backdrop" id="extraExModal">
   <div class="modal">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -936,7 +916,6 @@
   </div>
 </div>
 
-<!-- Swap Exercise Modal -->
 <div class="modal-backdrop" id="swapModal">
   <div class="modal">
     <h2>Заменить упражнение</h2>
@@ -953,7 +932,6 @@
   </div>
 </div>
 
-<!-- Program Builder Modal -->
 <div class="modal-backdrop" id="builderModal">
   <div class="modal">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -979,7 +957,6 @@
   </div>
 </div>
 
-<!-- Profile, Supabase Sync, Excel Export & Database Restore Modal -->
 <div class="modal-backdrop" id="profileModal">
   <div class="modal">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -1003,9 +980,10 @@
       </div>
 
       <div id="sbAuthLoggedIn" style="display:none;">
-        <div id="sbUserStatus" style="font-size:12px; color:#6ee7b7; margin-bottom:8px; font-weight:600;"></div>
+        <div id="sbUserStatus" style="font-size:12px; color:#6ee7b7; margin-bottom:6px; font-weight:600;"></div>
+        <div id="sbSyncFeedback" style="font-size:12px; color:#cbd5e1; margin-bottom:8px; min-height:16px;"></div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-          <button class="log-btn" style="padding:9px; font-size:12px;" onclick="syncNowWithSupabase(true)">🔄 Синхронизировать</button>
+          <button class="log-btn" style="padding:9px; font-size:12px;" onclick="manualSyncAction()">🔄 Синхронизировать</button>
           <button class="t-btn" style="padding:9px; font-size:12px; color:#fca5a5;" onclick="sbSignOut()">Выйти</button>
         </div>
       </div>
@@ -1036,12 +1014,12 @@
 
     <div class="backup-card">
       <h3>📥 Загрузка сохранённой базы тренировок</h3>
-      <p style="font-size:12px; margin:0 0 10px;">Выберите файл базы (<code>.xlsx</code>, <code>.xls</code> или <code>.json</code>) или вставьте копию из буфера обмена:</p>
+      <p style="font-size:12px; margin:0 0 10px;">Выберите файл базы (<code>.xls</code>, <code>.xlsx</code> или <code>.json</code>) или вставьте копию из буфера обмена:</p>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
         <button class="t-btn" style="padding:10px; font-size:12px; border-color:#6366f1; color:#a5b4fc;" onclick="triggerImportBackup()">📂 Выбрать файл</button>
         <button class="t-btn" style="padding:10px; font-size:12px; border-color:#10b981; color:#6ee7b7;" onclick="importBackupFromClipboard()">📋 Вставить из буфера</button>
       </div>
-      <input type="file" id="importFileInput" accept=".xlsx,.xls,.json" style="display:none;" onchange="handleImportBackup(event)" />
+      <input type="file" id="importFileInput" accept=".xls,.xlsx,.json" style="display:none;" onchange="handleImportBackup(event)" />
     </div>
   </div>
 </div>
@@ -1086,7 +1064,6 @@
     }
   };
 
-  // Telegram WebApp & Account Isolation
   const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
   let currentUser = { id: "local_athlete", name: "Атлет", isTelegram: false, hasCloud: false };
 
@@ -1094,18 +1071,10 @@
     if (tg) {
       tg.ready();
       tg.expand();
-      if (tg.requestSafeArea) {
-        try { tg.requestSafeArea(); } catch (e) {}
-      }
-      if (tg.requestContentSafeArea) {
-        try { tg.requestContentSafeArea(); } catch (e) {}
-      }
-      if (tg.setHeaderColor) {
-        try { tg.setHeaderColor("#0f172a"); } catch (e) {}
-      }
-      if (tg.setBackgroundColor) {
-        try { tg.setBackgroundColor("#0f172a"); } catch (e) {}
-      }
+      if (tg.requestSafeArea) try { tg.requestSafeArea(); } catch (e) {}
+      if (tg.requestContentSafeArea) try { tg.requestContentSafeArea(); } catch (e) {}
+      if (tg.setHeaderColor) try { tg.setHeaderColor("#0f172a"); } catch (e) {}
+      if (tg.setBackgroundColor) try { tg.setBackgroundColor("#0f172a"); } catch (e) {}
       const u = tg.initDataUnsafe && tg.initDataUnsafe.user;
       if (u && u.id) {
         currentUser = {
@@ -1142,7 +1111,6 @@
     return `sportzal_${getActiveNamespaceId()}_${suffix}`;
   }
 
-  // Supabase Cloud Sync (shared across Telegram and browser)
   const DEFAULT_SB_CONFIG = {
     url: "https://gpftrkdomqrzxnsipeyx.supabase.co",
     anonKey: "sb_publishable_skynAmV2xa2OYYqp9826Vg_UGghBdl0"
@@ -1170,6 +1138,13 @@
     else localStorage.removeItem(SB_SESSION_KEY);
     updateHeaderUserBadge();
     renderSupabaseAuthUI();
+  }
+
+  function setSyncFeedback(msg, isError = false) {
+    const el = document.getElementById("sbSyncFeedback");
+    if (!el) return;
+    el.textContent = msg;
+    el.style.color = isError ? "#fca5a5" : "#6ee7b7";
   }
 
   function toggleSbAdvancedSettings() {
@@ -1228,6 +1203,39 @@
     }
   }
 
+  function carryOverLocalLogsOnLogin(sess) {
+    // Carry any logs stored under local_athlete or currentUser.id into the newly active sb_<user.id> namespace
+    const candidateKeys = [
+      `sportzal_${currentUser.id}_logs`,
+      `sportzal_local_athlete_logs`
+    ];
+    const targetKey = `sportzal_sb_${sess.user.id}_logs`;
+    let existingTarget = [];
+    try { existingTarget = JSON.parse(localStorage.getItem(targetKey) || "[]"); } catch {}
+    const seen = new Set(existingTarget.map(x => x && x.uid).filter(Boolean));
+    let added = 0;
+
+    candidateKeys.forEach(k => {
+      if (k === targetKey) return;
+      try {
+        const arr = JSON.parse(localStorage.getItem(k) || "[]");
+        if (Array.isArray(arr)) {
+          arr.forEach(item => {
+            if (item && item.uid && !seen.has(item.uid)) {
+              seen.add(item.uid);
+              existingTarget.push({ ...item, synced: false });
+              added++;
+            }
+          });
+        }
+      } catch {}
+    });
+
+    if (added > 0) {
+      localStorage.setItem(targetKey, JSON.stringify(existingTarget));
+    }
+  }
+
   async function sbSignIn() {
     const cfg = getSupabaseConfig();
     const email = document.getElementById("sbEmailInput").value.trim();
@@ -1259,23 +1267,17 @@
       }
       const noticeBox = document.getElementById("sbSignupNoticeBox");
       if (noticeBox) noticeBox.classList.remove("open");
-      const preLoginLogs = getLogs();
       saveSupabaseSession(data);
-      if (preLoginLogs.length > 0) {
-        const afterLoginLogs = getLogs();
-        const ids = new Set(afterLoginLogs.map(x => x.uid));
-        const combined = [...afterLoginLogs];
-        preLoginLogs.forEach(x => {
-          if (x && x.uid && !ids.has(x.uid)) {
-            ids.add(x.uid);
-            combined.push({ ...x, synced: false });
-          }
-        });
-        saveLogs(combined);
-      }
-      await syncNowWithSupabase(true);
+      carryOverLocalLogsOnLogin(data);
+      const syncRes = await syncNowWithSupabase(true);
       render();
-      showToast("Вход выполнен! Данные синхронизированы");
+      if (syncRes.ok) {
+        setSyncFeedback(`Синхронизировано! Записей в базе: ${syncRes.count}`);
+        showToast(`Вход выполнен! Записей: ${syncRes.count}`);
+      } else {
+        setSyncFeedback(`Ошибка синхронизации: ${syncRes.error}`, true);
+        showToast(syncRes.error || "Ошибка синхронизации", true);
+      }
     } catch (e) {
       showToast("Ошибка сети при входе в Supabase", true);
     }
@@ -1301,20 +1303,8 @@
         return;
       }
       if (data.access_token && data.user) {
-        const preLoginLogs = getLogs();
-      saveSupabaseSession(data);
-      if (preLoginLogs.length > 0) {
-        const afterLoginLogs = getLogs();
-        const ids = new Set(afterLoginLogs.map(x => x.uid));
-        const combined = [...afterLoginLogs];
-        preLoginLogs.forEach(x => {
-          if (x && x.uid && !ids.has(x.uid)) {
-            ids.add(x.uid);
-            combined.push({ ...x, synced: false });
-          }
-        });
-        saveLogs(combined);
-      }
+        saveSupabaseSession(data);
+        carryOverLocalLogsOnLogin(data);
         await syncNowWithSupabase(true);
         render();
         showToast("Аккаунт создан и подключён!");
@@ -1349,15 +1339,37 @@
     if (!cfg || !cfg.url || !cfg.anonKey || !sess || !sess.access_token) return;
 
     clearTimeout(sbSyncTimer);
-    sbSyncTimer = setTimeout(() => {
-      syncNowWithSupabase(false);
-    }, 1500);
+    sbSyncTimer = setTimeout(async () => {
+      const res = await syncNowWithSupabase(false);
+      if (res.ok) {
+        showToast(`Синхронизировано с облаком (${res.count} зап.)`);
+      } else {
+        showToast(`Не удалось отправить в облако: ${res.error}`, true);
+      }
+    }, 1200);
+  }
+
+  async function manualSyncAction() {
+    setSyncFeedback("Синхронизация с Supabase...");
+    showToast("Синхронизация...");
+    const res = await syncNowWithSupabase(true);
+    render();
+    renderSupabaseAuthUI();
+    if (res.ok) {
+      setSyncFeedback(`Синхронизировано! Записей: ${res.count}`);
+      showToast(`Синхронизировано! Записей: ${res.count}`);
+    } else {
+      setSyncFeedback(`Ошибка: ${res.error}`, true);
+      showToast(`Ошибка: ${res.error}`, true);
+    }
   }
 
   async function syncNowWithSupabase(pullFirst = false) {
     const cfg = getSupabaseConfig();
     const sess = getSupabaseSession();
-    if (!cfg || !cfg.url || !cfg.anonKey || !sess || !sess.access_token || !sess.user) return false;
+    if (!cfg || !cfg.url || !cfg.anonKey || !sess || !sess.access_token || !sess.user) {
+      return { ok: false, error: "Не выполнен вход в аккаунт", count: 0 };
+    }
 
     const headers = {
       "Content-Type": "application/json",
@@ -1367,7 +1379,6 @@
     };
 
     try {
-      // 1. Delete any pending removed log UIDs first
       if (sbPendingDeleteUids.size > 0) {
         const uidsToDel = Array.from(sbPendingDeleteUids);
         sbPendingDeleteUids.clear();
@@ -1380,7 +1391,6 @@
       }
 
       if (pullFirst) {
-        // Pull remote program
         const pRes = await fetch(`${cfg.url}/rest/v1/user_programs?user_id=eq.${encodeURIComponent(sess.user.id)}&select=program`, { headers });
         if (pRes.ok) {
           const pRows = await pRes.json();
@@ -1388,47 +1398,45 @@
             localStorage.setItem(storageKey("program"), JSON.stringify(pRows[0].program));
           }
         }
-        // Pull remote logs & merge with any existing local logs by uid
         const lRes = await fetch(`${cfg.url}/rest/v1/workout_logs?user_id=eq.${encodeURIComponent(sess.user.id)}&order=created_at.asc`, { headers });
-        if (lRes.ok) {
-          const rRows = await lRes.json();
-          const existingLocal = getLogs();
-          const mergedMap = new Map();
-
-          if (Array.isArray(rRows)) {
-            rRows.forEach(r => {
-              mergedMap.set(r.uid, {
-                uid: r.uid,
-                date: r.date,
-                workout: r.workout || "Тренировка",
-                exId: r.ex_id || "",
-                muscle: r.muscle || "",
-                exercise: r.exercise,
-                set: Number(r.set_num) || 1,
-                weight: Number(r.weight) || 0,
-                reps: Number(r.reps) || 0,
-                note: r.note || "",
-                synced: true
-              });
-            });
-          }
-
-          existingLocal.forEach(l => {
-            if (l && l.uid && !mergedMap.has(l.uid)) {
-              mergedMap.set(l.uid, { ...l, synced: false });
-            }
-          });
-
-          const mergedList = Array.from(mergedMap.values());
-          if (mergedList.length > 0) {
-            localStorage.setItem(storageKey("logs"), JSON.stringify(mergedList));
-          }
+        if (!lRes.ok) {
+          const errTxt = await lRes.text();
+          return { ok: false, error: `Чтение БД (${lRes.status}): ${errTxt.slice(0, 80)}`, count: 0 };
         }
+        const rRows = await lRes.json();
+        const existingLocal = getLogs();
+        const mergedMap = new Map();
+
+        if (Array.isArray(rRows)) {
+          rRows.forEach(r => {
+            mergedMap.set(r.uid, {
+              uid: r.uid,
+              date: r.date,
+              workout: r.workout || "Тренировка",
+              exId: r.ex_id || "",
+              muscle: r.muscle || "",
+              exercise: r.exercise,
+              set: Number(r.set_num) || 1,
+              weight: Number(r.weight) || 0,
+              reps: Number(r.reps) || 0,
+              note: r.note || "",
+              synced: true
+            });
+          });
+        }
+
+        existingLocal.forEach(l => {
+          if (l && l.uid && !mergedMap.has(l.uid)) {
+            mergedMap.set(l.uid, { ...l, synced: false });
+          }
+        });
+
+        const mergedList = Array.from(mergedMap.values());
+        localStorage.setItem(storageKey("logs"), JSON.stringify(mergedList));
       }
 
-      // Push current local program & logs
       const localProg = getProgram();
-      await fetch(`${cfg.url}/rest/v1/user_programs`, {
+      const upProgRes = await fetch(`${cfg.url}/rest/v1/user_programs`, {
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -1437,6 +1445,10 @@
           updated_at: new Date().toISOString()
         })
       });
+      if (!upProgRes.ok) {
+        const errTxt = await upProgRes.text();
+        return { ok: false, error: `Программа (${upProgRes.status}): ${errTxt.slice(0, 80)}`, count: getLogs().length };
+      }
 
       const localLogs = getLogs();
       if (localLogs.length > 0) {
@@ -1453,16 +1465,20 @@
           reps: Number(l.reps) || 0,
           note: l.note || ""
         }));
-        await fetch(`${cfg.url}/rest/v1/workout_logs`, {
+        const upLogsRes = await fetch(`${cfg.url}/rest/v1/workout_logs`, {
           method: "POST",
           headers,
           body: JSON.stringify(payload)
         });
+        if (!upLogsRes.ok) {
+          const errTxt = await upLogsRes.text();
+          return { ok: false, error: `Запись в БД (${upLogsRes.status}): ${errTxt.slice(0, 80)}`, count: localLogs.length };
+        }
       }
 
-      return true;
+      return { ok: true, error: "", count: localLogs.length };
     } catch (e) {
-      return false;
+      return { ok: false, error: e && e.message ? e.message : "Ошибка сети", count: 0 };
     }
   }
 
@@ -1518,7 +1534,6 @@
     });
   }
 
-  // App State
   let currentView = "home";
   let activeDayKey = "A";
   let statsSubTab = "charts";
@@ -1532,7 +1547,6 @@
   let builderDay = "A";
   let selectedChartEx = "";
 
-  // Workout session timer state (per day/session)
   let workoutSessionActive = false;
   let workoutSessionStartMs = null;
   let workoutSessionFinishedSec = 0;
@@ -1583,7 +1597,6 @@
     workoutSessionStartMs = Date.now();
     workoutSessionFinishedSec = 0;
 
-    // Expand the first exercise when workout starts
     const prog = getProgram();
     const allEx = getDayExercises(prog, activeDayKey);
     if (allEx.length > 0) {
@@ -1603,7 +1616,6 @@
     workoutSessionStartMs = null;
     clearInterval(workoutSessionInterval);
 
-    // Save last finished workout duration in localStorage
     localStorage.setItem(storageKey("last_workout_duration"), JSON.stringify({
       date: getTodayISO(),
       dayKey: activeDayKey,
@@ -1652,9 +1664,14 @@
       }
     } catch {}
 
-    if (getSupabaseSession() && getSupabaseConfig()) {
-      await syncNowWithSupabase(true);
+    const sbSess = getSupabaseSession();
+    if (sbSess && sbSess.access_token && getSupabaseConfig()) {
+      carryOverLocalLogsOnLogin(sbSess);
+      const res = await syncNowWithSupabase(true);
       render();
+      if (res.ok && res.count > 0) {
+        showToast(`Загружено из облака: ${res.count} зап.`);
+      }
     }
 
     if (!currentUser.hasCloud) return;
@@ -1692,7 +1709,6 @@
     setTimeout(() => t.classList.remove("show"), 2600);
   }
 
-  // Navigation
   function goHome() {
     currentView = "home";
     stopTimer();
@@ -1712,7 +1728,6 @@
     } else if (!prog[activeDayKey]) {
       activeDayKey = keys[0];
     }
-    // Keep cards collapsed until user clicks "Начать тренировку" or taps a card manually
     if (!workoutSessionActive && !expandedByDay[activeDayKey]) {
       expandedByDay[activeDayKey] = "__NONE__";
     }
@@ -1795,7 +1810,6 @@
     `;
   }
 
-  // Add Extra Exercise during Current Workout
   function openExtraExModal() {
     document.getElementById("extraExName").value = "";
     document.getElementById("extraExMuscle").value = "Средние дельты";
@@ -1849,7 +1863,6 @@
     render();
   }
 
-  // Swap Exercise
   function openSwapModal(dayKey, exId) {
     const prog = getProgram();
     const ex = getDayExercises(prog, dayKey).find(x => x.id === exId);
@@ -1890,7 +1903,6 @@
     render();
   }
 
-  // Custom Program Builder
   function openBuilder() {
     builderDraft = getProgram();
     const keys = Object.keys(builderDraft);
@@ -2070,7 +2082,6 @@
     showToast("Сброшено к базовой программе");
   }
 
-  // Profile, XLSX Export, Directory Picker & Robust Import
   function openProfileModal() {
     const logs = getLogs();
     const hintBox = document.getElementById("exportHintBox");
@@ -2078,6 +2089,8 @@
       hintBox.classList.remove("open");
       hintBox.innerHTML = "";
     }
+    const fb = document.getElementById("sbSyncFeedback");
+    if (fb) fb.textContent = "";
 
     const modeText = currentUser.hasCloud
       ? `Профиль: <strong>${currentUser.name}</strong> (Telegram ID: <code>${currentUser.id}</code>).<br/>Данные изолированы и привязаны к вашему аккаунту.`
@@ -2180,7 +2193,7 @@
 
     exportDatabaseXLSX(false);
     hintBox.innerHTML = `
-      <strong>ℹ️ Выбор папки через системный проводник поддерживается в Chrome/Edge на ПК; на смартфоне браузер сохраняет файл в папку «Загрузки» (иногда в подпапку <code>Telegram</code>).</strong><br/>
+      <strong>ℹ️ Файл <code>${filename}</code> сохранён в папку «Загрузки».</strong><br/>
       Либо нажмите <strong>«📋 Копия в буфер»</strong> и вставьте базу напрямую в заметку, письмо или мессенджер.
     `;
     hintBox.classList.add("open");
@@ -2251,7 +2264,7 @@
     const xlsxBlob = new Blob([xlsBuffer], { type: xlsMime });
 
     if (shareMode) {
-      const fileObj = new File([xlsxBlob], filename, { type: xlsxMime });
+      const fileObj = new File([xlsxBlob], filename, { type: xlsMime });
 
       if (navigator.canShare && navigator.canShare({ files: [fileObj] })) {
         try {
@@ -2270,7 +2283,7 @@
       triggerBlobDownload(xlsxBlob, filename);
       hintBox.innerHTML = `
         <strong>✅ Файл <code>${filename}</code> сохранён!</strong><br/>
-        Встроенное окно Telegram/браузера на этом устройстве не открыло меню отправки файлов напрямую. Найдите <code>${filename}</code> в системной папке <strong>«Загрузки»</strong> (или <code>Downloads/Telegram</code>) и прикрепите к письму или отправьте в «Избранное», либо используйте <strong>«📋 Копия в буфер»</strong>.
+        Найдите <code>${filename}</code> в системной папке <strong>«Загрузки»</strong> и прикрепите к письму или отправьте в «Избранное», либо используйте <strong>«📋 Копия в буфер»</strong>.
       `;
       hintBox.classList.add("open");
       showToast("Файл .xls сохранён в «Загрузки»!");
@@ -2300,10 +2313,10 @@
         const [handle] = await window.showOpenFilePicker({
           multiple: false,
           types: [{
-            description: "Файлы базы СПОРТЗАЛ (.xlsx, .xls, .json)",
+            description: "Файлы базы СПОРТЗАЛ (.xls, .xlsx, .json)",
             accept: {
-              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
               "application/vnd.ms-excel": [".xls"],
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
               "application/json": [".json"]
             }
           }]
@@ -2474,7 +2487,6 @@
     showToast(`База загружена! Записей: ${(data.logs || []).length}`);
   }
 
-  // Logging Sets
   async function logSet(dayKey, exId) {
     const prog = getProgram();
     const dayObj = prog[dayKey];
@@ -2544,7 +2556,6 @@
     }
   }
 
-  // Debounced deleteLog to prevent rate-limit freezes on Telegram Desktop
   let pendingDeleteLogs = null;
   let deleteCloudDebounceTimer = null;
 
@@ -2573,7 +2584,6 @@
     }
   }
 
-  // Rest Timer
   function formatTime(sec) {
     const m = String(Math.floor(sec / 60)).padStart(2, "0");
     const s = String(sec % 60).padStart(2, "0");
@@ -2631,7 +2641,6 @@
     document.getElementById("timerDisplay").textContent = "01:30";
   }
 
-  // Muscle & Day Taxonomy for Hierarchical Statistics
   const MUSCLE_TAXONOMY = [
     { key: "ALL", label: "Все мышцы", subs: [] },
     {
@@ -2762,7 +2771,6 @@
     render();
   }
 
-  // Local Deterministic AI Coach (strictly grounded in logs & training rules)
   function buildCoachAdvice(promptKey, logs, prog) {
     if (!logs || logs.length === 0) {
       return "В вашем журнале пока нет записанных подходов (0 записей). Недостаточно фактических данных для анализа прогрессии, падения повторений или объёма. Запишите хотя бы 1–2 тренировки в разделе «Тренировка», и советчик разберёт реальные цифры.";
@@ -2772,7 +2780,6 @@
     const totalTonnage = Math.round(logs.reduce((acc, l) => acc + (Number(l.weight) || 0) * (Number(l.reps) || 0), 0));
     const uniqueDates = Array.from(new Set(logs.map(l => l.date))).sort();
 
-    // Group logs by exercise
     const byEx = {};
     logs.forEach(l => {
       if (!byEx[l.exercise]) byEx[l.exercise] = [];
@@ -2801,7 +2808,8 @@
 
       lines.push("");
       lines.push("Правило прогрессии (из базы): повышайте рабочий вес плавно (на 1,25–2,5 кг) только после уверенного выполнения целевого диапазона повторений с сохранением техники и без работы в отказ на каждом подходе.");
-      return lines.join("\n");
+      return lines.join("
+");
     }
 
     if (promptKey === "volume") {
@@ -2828,10 +2836,10 @@
         groupCounts.OTHER > 0 ? `• Прочее / без тега мышцы: ${groupCounts.OTHER} подх.` : "",
         "",
         "Ориентиры из базы: акцент на плечи и руки поддерживается целевыми подходами в днях А/Б/В при разумном недельном объёме (без избыточного «отказа» на каждом подходе)."
-      ].filter(Boolean).join("\n");
+      ].filter(Boolean).join("
+");
     }
 
-    // default: recovery & fatigue check from logs
     const notesSummary = logs.filter(l => l.note).map(l => l.note);
     const failureCount = notesSummary.filter(n => n.toLowerCase().includes("отказ")).length;
     const reserveCount = notesSummary.filter(n => n.toLowerCase().includes("запас")).length;
@@ -2845,7 +2853,8 @@
       "Выводы строго по правилам базы:",
       "1. Если повторения падают от подхода к подходу или вес не растёт — проверьте интервал отдыха между подходами (при необходимости увеличьте на 30–60 сек) и восстановление (сон 7–9 часов, белок ~1,6–2 г/кг).",
       "2. Избегайте постоянного «отказа» в базовых движениях и следите за общим недельным объёмом."
-    ].join("\n");
+    ].join("
+");
   }
 
   function renderCoach(logs, prog) {
@@ -2874,7 +2883,6 @@
     `;
   }
 
-  // Render Statistics
   function renderStats(logs, prog) {
     const exCatalogMap = new Map();
     Object.entries(prog).forEach(([dKey, dayObj]) => {
@@ -3094,7 +3102,6 @@
     return html;
   }
 
-  // Main Render
   function render() {
     const subNav = document.getElementById("subNavContainer");
     const headerBackSlot = document.getElementById("headerBackSlot");
