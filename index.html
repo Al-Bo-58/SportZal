@@ -1351,9 +1351,11 @@
   }
 
   async function manualSyncAction() {
-    setSyncFeedback("Синхронизация с Supabase...");
+    setSyncFeedback("Отправка и синхронизация с Supabase...");
     showToast("Синхронизация...");
-    const res = await syncNowWithSupabase(true);
+    // When user explicitly clicks "Синхронизировать", push current deduplicated local state
+    // (including any deleted entries) so cloud matches what the user currently has in the app.
+    const res = await syncNowWithSupabase(false, false, true);
     render();
     renderSupabaseAuthUI();
     if (res.ok) {
@@ -1384,7 +1386,7 @@
     return null;
   }
 
-  async function syncNowWithSupabase(pullFirst = false, didRetryAuth = false) {
+  async function syncNowWithSupabase(pullFirst = false, didRetryAuth = false, replaceRemoteLogs = false) {
     const cfg = getSupabaseConfig();
     let sess = getSupabaseSession();
     if (!cfg || !cfg.url || !cfg.anonKey || !sess || !sess.access_token || !sess.user) {
@@ -1480,6 +1482,27 @@
 
       const localLogs = deduplicateLogsList(getLogs());
       localStorage.setItem(storageKey("logs"), JSON.stringify(localLogs));
+
+      if (replaceRemoteLogs) {
+        // Delete existing remote logs for this user before writing the clean local list so deleted duplicates never come back
+        const delAllRes = await fetch(`${cfg.url}/rest/v1/workout_logs?user_id=eq.${encodeURIComponent(sess.user.id)}`, {
+          method: "DELETE",
+          headers
+        });
+        if (!delAllRes.ok) {
+          const errTxt = await delAllRes.text();
+          if ((delAllRes.status === 401 || errTxt.toLowerCase().includes("jwt expired")) && !didRetryAuth) {
+            const refreshedSess = await refreshSupabaseSessionIfNeeded(cfg, sess);
+            if (refreshedSess) {
+              return await syncNowWithSupabase(pullFirst, true, replaceRemoteLogs);
+            }
+            saveSupabaseSession(null);
+            return { ok: false, error: "Сессия истекла — войдите по Email и паролю заново", count: 0 };
+          }
+          return { ok: false, error: `Очистка БД (${delAllRes.status}): ${errTxt.slice(0, 80)}`, count: localLogs.length };
+        }
+      }
+
       if (localLogs.length > 0) {
         const payload = localLogs.map(l => ({
           uid: l.uid,
