@@ -1170,6 +1170,7 @@
         return false;
       }
 
+      // Also query all user logs for that date & remove any matching semantic entries so no duplicate row remains in Supabase
       const qUrl = `${cfg.url}/rest/v1/workout_logs?user_id=eq.${encodeURIComponent(sess.user.id)}&date=eq.${encodeURIComponent(targetItem.date)}&select=uid,workout,exercise,date,set_num,weight,reps`;
       const qRes = await fetch(qUrl, {
         method: "GET",
@@ -1288,6 +1289,7 @@
   }
 
   function carryOverLocalLogsOnLogin(sess) {
+    // Carry any logs stored under local_athlete or currentUser.id into the newly active sb_<user.id> namespace
     const candidateKeys = [
       `sportzal_${currentUser.id}_logs`,
       `sportzal_local_athlete_logs`
@@ -1441,6 +1443,7 @@
   async function manualSyncAction() {
     setSyncFeedback("Синхронизация с Supabase...");
     showToast("Синхронизация...");
+    // First delete any locally removed UIDs in Supabase, then pull & merge remote + local (deduplicated), then push any unsynced local rows
     const res = await syncNowWithSupabase(true, false, false);
     render();
     renderSupabaseAuthUI();
@@ -1617,9 +1620,9 @@
 
       const localLogs = deduplicateLogsList(getLogs());
       localStorage.setItem(storageKey("logs"), JSON.stringify(localLogs));
-      const unsyncedCount = localLogs.filter(x => x && x.synced === false).length;
 
       if (replaceRemoteLogs) {
+        // Delete existing remote logs for this user before writing the clean local list so deleted duplicates never come back
         const delAllRes = await fetch(`${cfg.url}/rest/v1/workout_logs?user_id=eq.${encodeURIComponent(sess.user.id)}`, {
           method: "DELETE",
           headers
@@ -1659,22 +1662,11 @@
         });
         if (!upLogsRes.ok) {
           const errTxt = await upLogsRes.text();
-          if ((upLogsRes.status === 401 || errTxt.toLowerCase().includes("jwt expired")) && !didRetryAuth) {
-            const refreshedSess = await refreshSupabaseSessionIfNeeded(cfg, sess);
-            if (refreshedSess) {
-              return await syncNowWithSupabase(pullFirst, true, replaceRemoteLogs);
-            }
-            saveSupabaseSession(null);
-            return { ok: false, error: "Сессия истекла — войдите по Email и паролю заново", count: 0 };
-          }
           return { ok: false, error: `Запись в БД (${upLogsRes.status}): ${errTxt.slice(0, 80)}`, count: localLogs.length };
         }
-        const markedLogs = localLogs.map(l => ({ ...l, synced: true }));
-        localStorage.setItem(storageKey("logs"), JSON.stringify(markedLogs));
-        return { ok: true, error: "", count: markedLogs.length, retriedUnsynced: unsyncedCount };
       }
 
-      return { ok: true, error: "", count: localLogs.length, retriedUnsynced: 0 };
+      return { ok: true, error: "", count: localLogs.length };
     } catch (e) {
       return { ok: false, error: e && e.message ? e.message : "Ошибка сети", count: 0 };
     }
@@ -1891,9 +1883,6 @@
     const raw = JSON.stringify(prog);
     localStorage.setItem(storageKey("program"), raw);
     syncToTelegramCloud("program", raw);
-    if (getSupabaseSession() && getSupabaseConfig()) {
-      syncNowWithSupabase(false);
-    }
   }
 
   function getLogs() {
@@ -1949,6 +1938,7 @@
       try {
         const parsedLogs = JSON.parse(cloudLogs);
         if (Array.isArray(parsedLogs)) {
+          // Do not let stale Telegram CloudStorage overwrite logs when Supabase is active or when local has pending deletions
           const hasPendingDel = loadPendingDeleteUids().size > 0 || loadPendingDeleteSemKeys().size > 0;
           const hasSb = Boolean(getSupabaseSession() && getSupabaseSession().access_token);
           if (!hasSb && !hasPendingDel && parsedLogs.length >= getLogs().length) {
@@ -2778,7 +2768,7 @@
       weight: weight,
       reps: reps,
       note: note,
-      synced: false
+      synced: !currentUser.hasCloud
     };
 
     logs.push(entry);
@@ -2802,16 +2792,22 @@
     render();
     syncNowWithSupabase(false).then(res => {
       if (res && res.ok) {
-        const cur = getLogs().map(item => item.uid === entry.uid ? { ...item, synced: true } : item);
-        saveLogs(cur);
         showToast(`Подход ${setNumber} записан и отправлен в облако!`);
-      } else {
-        showToast(`Подход ${setNumber} сохранён локально (доотправится при синхронизации)`, true);
       }
     });
 
     if (currentUser.hasCloud) {
-      await syncToTelegramCloud("logs", JSON.stringify(logs));
+      const ok = await syncToTelegramCloud("logs", JSON.stringify(logs));
+      if (ok) {
+        const updated = getLogs();
+        updated.forEach(item => item.synced = true);
+        saveLogs(updated);
+        showToast(`Подход ${setNumber} записан!`);
+      } else {
+        showToast(`Подход ${setNumber} сохранён локально`, true);
+      }
+    } else {
+      showToast(`Подход ${setNumber} записан!`);
     }
   }
 
@@ -2837,8 +2833,11 @@
     deleteRowInSupabaseNow(target).then(ok => {
       if (ok) {
         showToast("Удалено из Supabase");
+        if (getSupabaseSession() && getSupabaseConfig()) {
+          syncNowWithSupabase(false);
+        }
       } else {
-        showToast("Удалено локально (проверьте связь/права БД)", true);
+        showToast("Удалено локально (доудалим при синхронизации)", true);
       }
     });
 
