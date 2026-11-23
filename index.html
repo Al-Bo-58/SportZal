@@ -1167,6 +1167,7 @@
           const refreshed = await refreshSupabaseSessionIfNeeded(cfg, sess);
           if (refreshed) return await deleteRowInSupabaseNow(targetItem, true);
         }
+        showToast(`Ошибка удаления в БД (${res1.status}): ${errTxt.slice(0, 60)}`, true);
         return false;
       }
 
