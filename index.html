@@ -565,6 +565,13 @@
       transition: transform 0.1s, background 0.15s;
     }
     .log-btn:active { transform: scale(0.98); background: var(--accent-hover); }
+    .log-btn:disabled {
+      background: #334155 !important;
+      color: #64748b !important;
+      cursor: not-allowed;
+      opacity: 0.65;
+      transform: none;
+    }
 
     .add-extra-ex-btn {
       width: 100%;
@@ -982,20 +989,17 @@
     <p id="profileDetails" style="margin-bottom:8px;">Загрузка профиля...</p>
 
     <div class="backup-card" id="supabaseCard">
-      <h3>☁️ Синхронизация между Telegram и браузером (Supabase)</h3>
-      <p style="font-size:12px; margin:0 0 8px;">Укажите Project URL и Anon Key из Supabase, чтобы журнал и программа синхронизировались между Telegram и браузером:</p>
-      <input type="text" id="sbUrlInput" class="field-input" placeholder="https://xxxxxxxxxxxx.supabase.co" />
-      <input type="text" id="sbKeyInput" class="field-input" placeholder="eyJ... (anon public key)" />
-      <button class="t-btn" style="width:100%; margin-bottom:10px; border-color:#6366f1; color:#c7d2fe;" onclick="saveSupabaseConfig()">Сохранить настройки облака</button>
+      <h3>☁️ Облачный аккаунт и синхронизация</h3>
+      <p style="font-size:12px; margin:0 0 8px;">Войдите по Email и паролю, чтобы ваши тренировки и статистика синхронизировались между Telegram и браузером:</p>
 
       <div id="sbAuthLoggedOut">
-        <div style="font-size:11px; color:#a5b4fc; font-weight:700; margin-bottom:6px;">Вход или регистрация (Email + пароль):</div>
-        <input type="email" id="sbEmailInput" class="field-input" placeholder="your@email.com" />
-        <input type="password" id="sbPassInput" class="field-input" placeholder="Пароль (минимум 6 символов)" />
+        <input type="email" id="sbEmailInput" class="field-input" placeholder="Введите ваш Email (например, name@gmail.com)" oninput="updateSbAuthButtonsState()" />
+        <input type="password" id="sbPassInput" class="field-input" placeholder="Пароль (минимум 6 символов)" oninput="updateSbAuthButtonsState()" />
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-          <button class="log-btn" style="padding:9px; font-size:12px;" onclick="sbSignIn()">Войти</button>
-          <button class="log-btn" style="padding:9px; font-size:12px; background:#059669;" onclick="sbSignUp()">Регистрация</button>
+          <button id="sbSignInBtn" class="log-btn" style="padding:9px; font-size:12px;" disabled onclick="sbSignIn()">Войти</button>
+          <button id="sbSignUpBtn" class="log-btn" style="padding:9px; font-size:12px; background:#059669;" disabled onclick="sbSignUp()">Регистрация</button>
         </div>
+        <div id="sbSignupNoticeBox" class="hint-box" style="margin-top:10px;"></div>
       </div>
 
       <div id="sbAuthLoggedIn" style="display:none;">
@@ -1003,6 +1007,15 @@
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
           <button class="log-btn" style="padding:9px; font-size:12px;" onclick="syncNowWithSupabase(true)">🔄 Синхронизировать</button>
           <button class="t-btn" style="padding:9px; font-size:12px; color:#fca5a5;" onclick="sbSignOut()">Выйти</button>
+        </div>
+      </div>
+
+      <div style="margin-top:10px; border-top:1px dashed var(--card-border); padding-top:8px;">
+        <button class="mini-btn" style="width:100%; text-align:center; color:var(--muted);" onclick="toggleSbAdvancedSettings()">⚙️ Настройки сервера Supabase (подключено по умолчанию)</button>
+        <div id="sbAdvancedBox" style="display:none; margin-top:8px;">
+          <input type="text" id="sbUrlInput" class="field-input" placeholder="https://xxxxxxxxxxxx.supabase.co" />
+          <input type="text" id="sbKeyInput" class="field-input" placeholder="sb_publishable_..." />
+          <button class="t-btn" style="width:100%; border-color:#6366f1; color:#c7d2fe;" onclick="saveSupabaseConfig()">Сохранить настройки сервера</button>
         </div>
       </div>
     </div>
@@ -1130,14 +1143,21 @@
   }
 
   // Supabase Cloud Sync (shared across Telegram and browser)
+  const DEFAULT_SB_CONFIG = {
+    url: "https://gpftrkdomqrzxnsipeyx.supabase.co",
+    anonKey: "sb_publishable_skynAmV2xa2OYYqp9826Vg_UGghBdl0"
+  };
   const SB_CONFIG_KEY = "sportzal_shared_sb_config";
   const SB_SESSION_KEY = "sportzal_shared_sb_session";
   let sbSyncTimer = null;
   let sbPendingDeleteUids = new Set();
 
   function getSupabaseConfig() {
-    try { return JSON.parse(localStorage.getItem(SB_CONFIG_KEY) || "null"); }
-    catch { return null; }
+    try {
+      const stored = JSON.parse(localStorage.getItem(SB_CONFIG_KEY) || "null");
+      if (stored && stored.url && stored.anonKey) return stored;
+    } catch {}
+    return { ...DEFAULT_SB_CONFIG };
   }
 
   function getSupabaseSession() {
@@ -1152,15 +1172,35 @@
     renderSupabaseAuthUI();
   }
 
+  function toggleSbAdvancedSettings() {
+    const box = document.getElementById("sbAdvancedBox");
+    if (!box) return;
+    box.style.display = box.style.display === "none" ? "block" : "none";
+  }
+
+  function updateSbAuthButtonsState() {
+    const emailEl = document.getElementById("sbEmailInput");
+    const passEl = document.getElementById("sbPassInput");
+    const inBtn = document.getElementById("sbSignInBtn");
+    const upBtn = document.getElementById("sbSignUpBtn");
+    if (!emailEl || !inBtn || !upBtn) return;
+
+    const emailVal = emailEl.value.trim();
+    const passVal = passEl ? passEl.value : "";
+    const isReady = emailVal.length > 0 && emailVal.includes("@") && passVal.length >= 6;
+    inBtn.disabled = !isReady;
+    upBtn.disabled = !isReady;
+  }
+
   function saveSupabaseConfig() {
     const url = document.getElementById("sbUrlInput").value.trim().replace(/\/+$/, "");
     const anonKey = document.getElementById("sbKeyInput").value.trim();
     if (!url || !anonKey) {
-      showToast("Введите Project URL и Anon Key", true);
+      showToast("Введите Project URL и Publishable Key", true);
       return;
     }
     localStorage.setItem(SB_CONFIG_KEY, JSON.stringify({ url, anonKey }));
-    showToast("Настройки Supabase сохранены!");
+    showToast("Настройки сервера сохранены!");
   }
 
   function renderSupabaseAuthUI() {
@@ -1184,15 +1224,12 @@
     } else {
       outBox.style.display = "block";
       inBox.style.display = "none";
+      updateSbAuthButtonsState();
     }
   }
 
   async function sbSignIn() {
     const cfg = getSupabaseConfig();
-    if (!cfg || !cfg.url || !cfg.anonKey) {
-      showToast("Сначала сохраните URL и Anon Key Supabase", true);
-      return;
-    }
     const email = document.getElementById("sbEmailInput").value.trim();
     const password = document.getElementById("sbPassInput").value;
     if (!email || !password) {
@@ -1207,9 +1244,21 @@
       });
       const data = await res.json();
       if (!res.ok) {
-        showToast(data.msg || data.error_description || "Ошибка входа", true);
+        const errMsg = (data.msg || data.error_description || "").toLowerCase();
+        if (errMsg.includes("email not confirmed")) {
+          const noticeBox = document.getElementById("sbSignupNoticeBox");
+          if (noticeBox) {
+            noticeBox.innerHTML = `<strong>⚠️ Почта ещё не подтверждена!</strong><br/>Откройте ваш почтовый ящик <code>${email}</code> (проверьте «Входящие» и папку «Спам»), найдите письмо от <strong>Supabase</strong> и перейдите по ссылке подтверждения, после чего снова нажмите «Войти».`;
+            noticeBox.classList.add("open");
+          }
+          showToast("Сначала подтвердите почту по ссылке из письма", true);
+        } else {
+          showToast(data.msg || data.error_description || "Ошибка входа", true);
+        }
         return;
       }
+      const noticeBox = document.getElementById("sbSignupNoticeBox");
+      if (noticeBox) noticeBox.classList.remove("open");
       saveSupabaseSession(data);
       await syncNowWithSupabase(true);
       render();
@@ -1221,10 +1270,6 @@
 
   async function sbSignUp() {
     const cfg = getSupabaseConfig();
-    if (!cfg || !cfg.url || !cfg.anonKey) {
-      showToast("Сначала сохраните URL и Anon Key Supabase", true);
-      return;
-    }
     const email = document.getElementById("sbEmailInput").value.trim();
     const password = document.getElementById("sbPassInput").value;
     if (!email || !password) {
@@ -1248,7 +1293,17 @@
         render();
         showToast("Аккаунт создан и подключён!");
       } else {
-        showToast("Регистрация успешна! Теперь нажмите «Войти»");
+        const noticeBox = document.getElementById("sbSignupNoticeBox");
+        if (noticeBox) {
+          noticeBox.innerHTML = `
+            <strong>✉️ Письмо отправлено на <code>${email}</code>!</strong><br/>
+            1. Откройте вашу почту и проверьте папку <strong>«Входящие»</strong> (если письма нет — обязательно загляните в <strong>«Спам»</strong> или <strong>«Промоакции»</strong>).<br/>
+            2. Найдите письмо от <strong>Supabase</strong> с темой подтверждения регистрации (<em>Confirm Your Signup</em>) и нажмите на ссылку внутри.<br/>
+            3. После перехода по ссылке вернитесь сюда и нажмите синюю кнопку <strong>«Войти»</strong>.
+          `;
+          noticeBox.classList.add("open");
+        }
+        showToast("Проверьте почту и подтвердите регистрацию!");
       }
     } catch (e) {
       showToast("Ошибка сети при регистрации", true);
