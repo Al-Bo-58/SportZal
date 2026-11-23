@@ -53,15 +53,29 @@
     .brand {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       cursor: pointer;
+      min-width: 0;
     }
+    .header-back-btn {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      color: #f3f2f2;
+      border-radius: 9px;
+      padding: 6px 9px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .header-back-btn:active { background: var(--accent); }
     .brand h1 {
       margin: 0;
       font-family: 'Roboto', sans-serif;
-      font-size: 20px;
+      font-size: 18px;
       font-weight: 700;
-      letter-spacing: 0.4px;
+      letter-spacing: 0.3px;
       color: #f3f2f2;
     }
     .header-actions {
@@ -838,8 +852,11 @@
 <body>
 
 <header>
-  <div class="brand" onclick="goHome()" title="На главную">
-    <h1>СПОРТЗАЛ</h1>
+  <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+    <div class="brand" onclick="goHome()" title="На главную">
+      <h1>СПОРТЗАЛ</h1>
+    </div>
+    <span id="headerBackSlot"></span>
   </div>
   <div class="header-actions">
     <div class="user-pill" onclick="openProfileModal()">
@@ -2984,11 +3001,18 @@
   // Main Render
   function render() {
     const subNav = document.getElementById("subNavContainer");
+    const headerBackSlot = document.getElementById("headerBackSlot");
     const container = document.getElementById("mainContainer");
     const timerBar = document.getElementById("timerBar");
     const logs = getLogs();
     const prog = getProgram();
     const today = getTodayISO();
+
+    if (headerBackSlot) {
+      headerBackSlot.innerHTML = currentView === "home"
+        ? ""
+        : `<button class="header-back-btn" onclick="goHome()">← Назад</button>`;
+    }
 
     if (currentView === "home") {
       subNav.innerHTML = "";
@@ -3036,8 +3060,7 @@
 
     if (currentView === "stats") {
       subNav.innerHTML = `
-        <div class="sub-topbar">
-          <button class="back-home-btn" onclick="goHome()">← На главную</button>
+        <div class="sub-topbar" style="justify-content:center;">
           <span style="font-size:13px; font-weight:700; color:#a5b4fc;">Статистика тренировок</span>
         </div>
       `;
@@ -3047,8 +3070,7 @@
 
     if (currentView === "coach") {
       subNav.innerHTML = `
-        <div class="sub-topbar">
-          <button class="back-home-btn" onclick="goHome()">← На главную</button>
+        <div class="sub-topbar" style="justify-content:center;">
           <span style="font-size:13px; font-weight:700; color:#6ee7b7;">Сводная информация</span>
         </div>
       `;
@@ -3061,10 +3083,9 @@
 
     subNav.innerHTML = `
       <div class="sub-topbar">
-        <button class="back-home-btn" onclick="goHome()">← Назад</button>
-        <div class="day-pills">
+        <div class="day-pills" style="width:100%; justify-content:space-between;">
           ${dayKeys.map(k => `
-            <button class="day-pill ${k === activeDayKey ? 'active' : ''}" onclick="switchWorkoutDay('${k}')">
+            <button class="day-pill ${k === activeDayKey ? 'active' : ''}" style="flex:1; text-align:center;" onclick="switchWorkoutDay('${k}')">
               ${prog[k].name}
             </button>
           `).join("")}
