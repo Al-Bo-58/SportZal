@@ -1447,6 +1447,8 @@
     const res = await syncNowWithSupabase(true, false, false);
     render();
     renderSupabaseAuthUI();
+    const cntEl = document.getElementById("profileLogsCountVal");
+    if (cntEl) cntEl.textContent = String(getLogs().length);
     if (res.ok) {
       setSyncFeedback(`Синхронизировано! Записей: ${res.count}`);
       showToast(`Синхронизировано! Записей: ${res.count}`);
@@ -2345,7 +2347,7 @@
     const modeText = currentUser.hasCloud
       ? `Профиль: <strong>${currentUser.name}</strong> (Telegram ID: <code>${currentUser.id}</code>).<br/>Данные изолированы и привязаны к вашему аккаунту.`
       : `Профиль: <strong>${currentUser.name}</strong>.<br/>Данные хранятся в памяти устройства/браузера; при входе в Supabase синхронизируются между Telegram и браузером.`;
-    document.getElementById("profileDetails").innerHTML = `${modeText}<br/>Всего записано подходов: <strong>${logs.length}</strong>`;
+    document.getElementById("profileDetails").innerHTML = `${modeText}<br/>Всего записано подходов: <strong id="profileLogsCountVal">${logs.length}</strong>`;
     renderSupabaseAuthUI();
     document.getElementById("profileModal").classList.add("open");
   }
