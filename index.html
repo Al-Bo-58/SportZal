@@ -1021,10 +1021,10 @@
     </div>
 
     <div class="backup-card">
-      <h3>📤 Сохранение и отправка базы (XLSX / Буфер)</h3>
-      <p style="font-size:12px; margin:0 0 10px;">Сохраните базу тренировок в формате Excel (<code>.xlsx</code>), выберите файл на ПК или скопируйте резервную копию:</p>
+      <h3>📤 Сохранение и отправка базы (.XLS / Буфер)</h3>
+      <p style="font-size:12px; margin:0 0 10px;">Сохраните базу тренировок в формате Excel (<code>.xls</code>), выберите файл на ПК или скопируйте резервную копию:</p>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
-        <button class="log-btn" style="padding:10px; font-size:12px;" onclick="exportDatabaseXLSX(false)">💾 Скачать .XLSX</button>
+        <button class="log-btn" style="padding:10px; font-size:12px;" onclick="exportDatabaseXLSX(false)">💾 Скачать .XLS</button>
         <button class="log-btn" style="padding:10px; font-size:12px; background:#059669;" onclick="exportDatabaseXLSX(true)">📤 На почту / Поделиться</button>
       </div>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
@@ -1259,7 +1259,20 @@
       }
       const noticeBox = document.getElementById("sbSignupNoticeBox");
       if (noticeBox) noticeBox.classList.remove("open");
+      const preLoginLogs = getLogs();
       saveSupabaseSession(data);
+      if (preLoginLogs.length > 0) {
+        const afterLoginLogs = getLogs();
+        const ids = new Set(afterLoginLogs.map(x => x.uid));
+        const combined = [...afterLoginLogs];
+        preLoginLogs.forEach(x => {
+          if (x && x.uid && !ids.has(x.uid)) {
+            ids.add(x.uid);
+            combined.push({ ...x, synced: false });
+          }
+        });
+        saveLogs(combined);
+      }
       await syncNowWithSupabase(true);
       render();
       showToast("Вход выполнен! Данные синхронизированы");
@@ -1288,7 +1301,20 @@
         return;
       }
       if (data.access_token && data.user) {
-        saveSupabaseSession(data);
+        const preLoginLogs = getLogs();
+      saveSupabaseSession(data);
+      if (preLoginLogs.length > 0) {
+        const afterLoginLogs = getLogs();
+        const ids = new Set(afterLoginLogs.map(x => x.uid));
+        const combined = [...afterLoginLogs];
+        preLoginLogs.forEach(x => {
+          if (x && x.uid && !ids.has(x.uid)) {
+            ids.add(x.uid);
+            combined.push({ ...x, synced: false });
+          }
+        });
+        saveLogs(combined);
+      }
         await syncNowWithSupabase(true);
         render();
         showToast("Аккаунт создан и подключён!");
@@ -1362,25 +1388,40 @@
             localStorage.setItem(storageKey("program"), JSON.stringify(pRows[0].program));
           }
         }
-        // Pull remote logs
+        // Pull remote logs & merge with any existing local logs by uid
         const lRes = await fetch(`${cfg.url}/rest/v1/workout_logs?user_id=eq.${encodeURIComponent(sess.user.id)}&order=created_at.asc`, { headers });
         if (lRes.ok) {
           const rRows = await lRes.json();
-          if (Array.isArray(rRows) && rRows.length > 0) {
-            const mapped = rRows.map(r => ({
-              uid: r.uid,
-              date: r.date,
-              workout: r.workout || "Тренировка",
-              exId: r.ex_id || "",
-              muscle: r.muscle || "",
-              exercise: r.exercise,
-              set: Number(r.set_num) || 1,
-              weight: Number(r.weight) || 0,
-              reps: Number(r.reps) || 0,
-              note: r.note || "",
-              synced: true
-            }));
-            localStorage.setItem(storageKey("logs"), JSON.stringify(mapped));
+          const existingLocal = getLogs();
+          const mergedMap = new Map();
+
+          if (Array.isArray(rRows)) {
+            rRows.forEach(r => {
+              mergedMap.set(r.uid, {
+                uid: r.uid,
+                date: r.date,
+                workout: r.workout || "Тренировка",
+                exId: r.ex_id || "",
+                muscle: r.muscle || "",
+                exercise: r.exercise,
+                set: Number(r.set_num) || 1,
+                weight: Number(r.weight) || 0,
+                reps: Number(r.reps) || 0,
+                note: r.note || "",
+                synced: true
+              });
+            });
+          }
+
+          existingLocal.forEach(l => {
+            if (l && l.uid && !mergedMap.has(l.uid)) {
+              mergedMap.set(l.uid, { ...l, synced: false });
+            }
+          });
+
+          const mergedList = Array.from(mergedMap.values());
+          if (mergedList.length > 0) {
+            localStorage.setItem(storageKey("logs"), JSON.stringify(mergedList));
           }
         }
       }
@@ -2050,7 +2091,7 @@
     document.getElementById("profileModal").classList.remove("open");
   }
 
-  function buildWorkbookBuffer(logs, prog, today) {
+  function buildWorkbookBuffer(logs, prog, today, bookType = "xls") {
     const wb = XLSX.utils.book_new();
 
     const journalRows = logs.map(l => ({
@@ -2103,14 +2144,14 @@
     const wsRestore = XLSX.utils.aoa_to_sheet(restoreRows);
     XLSX.utils.book_append_sheet(wb, wsRestore, "SportZal_DB");
 
-    return XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    return XLSX.write(wb, { bookType: bookType, type: "array" });
   }
 
   async function pickSaveDirectoryAndExport() {
     const logs = getLogs();
     const prog = getProgram();
     const today = getTodayISO();
-    const filename = `SportZal_Base_${today}.xlsx`;
+    const filename = `SportZal_Base_${today}.xls`;
     const hintBox = document.getElementById("exportHintBox");
 
     if (typeof window.showSaveFilePicker === "function") {
@@ -2118,12 +2159,12 @@
         const handle = await window.showSaveFilePicker({
           suggestedName: filename,
           types: [{
-            description: "Excel таблица (.xlsx)",
-            accept: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"] }
+            description: "Excel таблица (.xls)",
+            accept: { "application/vnd.ms-excel": [".xls"] }
           }]
         });
         const buf = typeof XLSX !== "undefined"
-          ? buildWorkbookBuffer(logs, prog, today)
+          ? buildWorkbookBuffer(logs, prog, today, "xls")
           : new TextEncoder().encode(JSON.stringify({ app: "СПОРТЗАЛ", program: prog, logs }, null, 2));
         const writable = await handle.createWritable();
         await writable.write(buf);
@@ -2183,7 +2224,7 @@
     const logs = getLogs();
     const prog = getProgram();
     const today = getTodayISO();
-    const filename = `SportZal_Base_${today}.xlsx`;
+    const filename = `SportZal_Base_${today}.xls`;
     const hintBox = document.getElementById("exportHintBox");
 
     if (typeof XLSX === "undefined") {
@@ -2205,9 +2246,9 @@
       return;
     }
 
-    const xlsxBuffer = buildWorkbookBuffer(logs, prog, today);
-    const xlsxMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-    const xlsxBlob = new Blob([xlsxBuffer], { type: xlsxMime });
+    const xlsBuffer = buildWorkbookBuffer(logs, prog, today, "xls");
+    const xlsMime = "application/vnd.ms-excel";
+    const xlsxBlob = new Blob([xlsBuffer], { type: xlsMime });
 
     if (shareMode) {
       const fileObj = new File([xlsxBlob], filename, { type: xlsxMime });
@@ -2232,7 +2273,7 @@
         Встроенное окно Telegram/браузера на этом устройстве не открыло меню отправки файлов напрямую. Найдите <code>${filename}</code> в системной папке <strong>«Загрузки»</strong> (или <code>Downloads/Telegram</code>) и прикрепите к письму или отправьте в «Избранное», либо используйте <strong>«📋 Копия в буфер»</strong>.
       `;
       hintBox.classList.add("open");
-      showToast("Файл .xlsx сохранён в «Загрузки»!");
+      showToast("Файл .xls сохранён в «Загрузки»!");
       return;
     }
 
@@ -3106,7 +3147,7 @@
 
           <div class="home-secondary-row">
             <button class="sec-nav-btn" onclick="openBuilder()">✏️ Моя программа</button>
-            <button class="sec-nav-btn" onclick="openProfileModal()">💾 База / Почта (.XLSX)</button>
+            <button class="sec-nav-btn" onclick="openProfileModal()">💾 База / Почта (.XLS)</button>
           </div>
         </div>
       `;
