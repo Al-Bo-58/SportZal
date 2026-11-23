@@ -1120,6 +1120,19 @@
   let sbSyncTimer = null;
   let sbPendingDeleteUids = new Set();
 
+  function loadPendingDeleteUids() {
+    try {
+      const arr = JSON.parse(localStorage.getItem(storageKey("pending_del_uids")) || "[]");
+      return new Set(Array.isArray(arr) ? arr : []);
+    } catch {
+      return new Set();
+    }
+  }
+
+  function savePendingDeleteUids(setObj) {
+    localStorage.setItem(storageKey("pending_del_uids"), JSON.stringify(Array.from(setObj)));
+  }
+
   function getSupabaseConfig() {
     try {
       const stored = JSON.parse(localStorage.getItem(SB_CONFIG_KEY) || "null");
@@ -1334,7 +1347,12 @@
   }
 
   function scheduleSupabaseSync(deleteUids = []) {
-    deleteUids.forEach(uid => sbPendingDeleteUids.add(uid));
+    const persisted = loadPendingDeleteUids();
+    deleteUids.forEach(uid => {
+      sbPendingDeleteUids.add(uid);
+      persisted.add(uid);
+    });
+    savePendingDeleteUids(persisted);
     const cfg = getSupabaseConfig();
     const sess = getSupabaseSession();
     if (!cfg || !cfg.url || !cfg.anonKey || !sess || !sess.access_token) return;
@@ -1351,11 +1369,10 @@
   }
 
   async function manualSyncAction() {
-    setSyncFeedback("Отправка и синхронизация с Supabase...");
+    setSyncFeedback("Синхронизация с Supabase...");
     showToast("Синхронизация...");
-    // When user explicitly clicks "Синхронизировать", push current deduplicated local state
-    // (including any deleted entries) so cloud matches what the user currently has in the app.
-    const res = await syncNowWithSupabase(false, false, true);
+    // First delete any locally removed UIDs in Supabase, then pull & merge remote + local (deduplicated), then push any unsynced local rows
+    const res = await syncNowWithSupabase(true, false, false);
     render();
     renderSupabaseAuthUI();
     if (res.ok) {
@@ -1401,9 +1418,11 @@
     };
 
     try {
-      if (sbPendingDeleteUids.size > 0) {
-        const uidsToDel = Array.from(sbPendingDeleteUids);
+      const allDelUids = new Set([...sbPendingDeleteUids, ...loadPendingDeleteUids()]);
+      if (allDelUids.size > 0) {
+        const uidsToDel = Array.from(allDelUids);
         sbPendingDeleteUids.clear();
+        savePendingDeleteUids(new Set());
         for (const uid of uidsToDel) {
           await fetch(`${cfg.url}/rest/v1/workout_logs?uid=eq.${encodeURIComponent(uid)}&user_id=eq.${encodeURIComponent(sess.user.id)}`, {
             method: "DELETE",
@@ -1437,8 +1456,10 @@
         const existingLocal = getLogs();
         const mergedMap = new Map();
 
+        const ignoredDeleted = new Set([...sbPendingDeleteUids, ...loadPendingDeleteUids()]);
         if (Array.isArray(rRows)) {
           rRows.forEach(r => {
+            if (ignoredDeleted.has(r.uid)) return;
             mergedMap.set(r.uid, {
               uid: r.uid,
               date: r.date,
@@ -2647,7 +2668,11 @@
     }
 
     render();
-    scheduleSupabaseSync([]);
+    syncNowWithSupabase(false).then(res => {
+      if (res && res.ok) {
+        showToast(`Подход ${setNumber} записан и отправлен в облако!`);
+      }
+    });
 
     if (currentUser.hasCloud) {
       const ok = await syncToTelegramCloud("logs", JSON.stringify(logs));
