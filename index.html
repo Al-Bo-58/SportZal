@@ -44,10 +44,11 @@
       background: rgba(15, 23, 42, 0.96);
       backdrop-filter: blur(10px);
       border-bottom: 1px solid var(--card-border);
-      padding: var(--top-safe) 16px 12px;
+      padding: var(--top-safe) 14px 12px;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 8px;
     }
     .brand {
       display: flex;
@@ -193,29 +194,35 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 14px 14px 8px 64px;
+      padding: 12px 14px 8px 14px;
       max-width: 600px;
       margin: 0 auto;
       gap: 8px;
+      flex-wrap: nowrap;
     }
     .back-home-btn {
       background: var(--card);
       border: 1px solid var(--card-border);
       color: #f3f2f2;
       border-radius: 10px;
-      padding: 8px 12px;
-      font-size: 13px;
+      padding: 8px 10px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       white-space: nowrap;
+      flex-shrink: 0;
     }
     .day-pills {
       display: flex;
       gap: 5px;
       flex: 1;
-      justify-content: flex-end;
+      min-width: 0;
+      justify-content: flex-start;
       overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
     }
+    .day-pills::-webkit-scrollbar { display: none; }
     .day-pill {
       background: var(--card);
       border: 1px solid var(--card-border);
@@ -870,7 +877,19 @@
     </div>
     <p>Впишите название дополнительного упражнения, которое хотите сделать сегодня:</p>
     <input type="text" id="extraExName" class="field-input" placeholder="Например: Подъём на носки стоя в тренажёре" />
-    <input type="text" id="extraExMuscle" class="field-input" placeholder="Мышечная группа (необязательно, напр. Икры)" />
+    <div style="font-size:11px; color:var(--muted); margin-bottom:4px; font-weight:600;">Мышечная группа:</div>
+    <select id="extraExMuscle" class="field-input">
+      <option value="Средние дельты">Плечи — Средние дельты</option>
+      <option value="Передние дельты">Плечи — Передние дельты</option>
+      <option value="Задние дельты">Плечи — Задние дельты</option>
+      <option value="Плечи">Плечи (общая)</option>
+      <option value="Бицепс">Руки — Бицепс</option>
+      <option value="Трицепс">Руки — Трицепс</option>
+      <option value="Грудь">Грудь</option>
+      <option value="Спина">Спина</option>
+      <option value="Ноги">Ноги</option>
+      <option value="Дополнительно">Дополнительно / Другое</option>
+    </select>
     <div class="field-grid-3" style="margin-bottom:10px;">
       <div>
         <div style="font-size:11px; color:var(--muted); margin-bottom:3px;">Подходы</div>
@@ -1666,7 +1685,7 @@
   // Add Extra Exercise during Current Workout
   function openExtraExModal() {
     document.getElementById("extraExName").value = "";
-    document.getElementById("extraExMuscle").value = "";
+    document.getElementById("extraExMuscle").value = "Средние дельты";
     document.getElementById("extraExSets").value = "3";
     document.getElementById("extraExReps").value = "12–15";
     document.getElementById("extraExRest").value = "90";
@@ -1860,7 +1879,9 @@
           </div>
         </div>
         <input type="text" id="bn_${idx}" class="field-input" value="${(ex.name || '').replace(/"/g, '&quot;')}" placeholder="Впишите название упражнения..." />
-        <input type="text" id="bm_${idx}" class="field-input" value="${(ex.muscle || '').replace(/"/g, '&quot;')}" placeholder="Группа мышц (необязательно)" />
+        <select id="bm_${idx}" class="field-input">
+          ${["Средние дельты", "Передние дельты", "Задние дельты", "Плечи", "Бицепс", "Трицепс", "Грудь", "Спина", "Ноги", "Дополнительно"].concat(ex.muscle && !["Средние дельты", "Передние дельты", "Задние дельты", "Плечи", "Бицепс", "Трицепс", "Грудь", "Спина", "Ноги", "Дополнительно"].includes(ex.muscle) ? [ex.muscle] : []).map(m => `<option value="${m.replace(/"/g, '&quot;')}" ${ex.muscle === m ? 'selected' : ''}>${m}</option>`).join("")}
+        </select>
         <div class="field-grid-3">
           <div>
             <div style="font-size:10px; color:var(--muted);">Подходы</div>
@@ -2718,7 +2739,7 @@
     const adviceText = buildCoachAdvice(coachSelectedPrompt, logs, prog);
     return `
       <div class="chart-card">
-        <div style="font-size:15px; font-weight:700; color:#f3f2f2; margin-bottom:6px;">🤖 ИИ Тренер (локальный советчик по фактам)</div>
+        <div style="font-size:15px; font-weight:700; color:#f3f2f2; margin-bottom:6px;">📋 Сводная информация (анализ фактов журнала)</div>
         <div style="font-size:12px; color:var(--muted); margin-bottom:12px;">
           Анализирует только ваши записи в журнале (${logs.length} подх.) и правила из базы — без выдумок и фантазий.
         </div>
@@ -2744,7 +2765,7 @@
   function renderStats(logs, prog) {
     const exCatalogMap = new Map();
     Object.entries(prog).forEach(([dKey, dayObj]) => {
-      (dayObj.exercises || []).forEach(e => {
+      getDayExercises(prog, dKey).forEach(e => {
         if (!e.name) return;
         const tags = classifyMuscleTags(e.muscle, e.name);
         exCatalogMap.set(e.name, {
@@ -2997,8 +3018,8 @@
 
             <button class="big-nav-btn coach-btn" onclick="openCoachView('progress')">
               <div>
-                <div>🤖 ИИ Тренер</div>
-                <span class="big-nav-desc">Советчик по фактам журнала и правилам программы</span>
+                <div>📋 Сводная информация</div>
+                <span class="big-nav-desc">Расчёты по фактам журнала и правилам программы</span>
               </div>
               <span style="font-size:22px;">→</span>
             </button>
@@ -3028,7 +3049,7 @@
       subNav.innerHTML = `
         <div class="sub-topbar">
           <button class="back-home-btn" onclick="goHome()">← На главную</button>
-          <span style="font-size:13px; font-weight:700; color:#6ee7b7;">ИИ Тренер</span>
+          <span style="font-size:13px; font-weight:700; color:#6ee7b7;">Сводная информация</span>
         </div>
       `;
       container.innerHTML = `<div class="container">${renderCoach(logs, prog)}</div>`;
