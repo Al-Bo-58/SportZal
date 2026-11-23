@@ -1364,9 +1364,28 @@
     }
   }
 
-  async function syncNowWithSupabase(pullFirst = false) {
+  async function refreshSupabaseSessionIfNeeded(cfg, sess) {
+    if (!sess || !sess.refresh_token) return null;
+    try {
+      const res = await fetch(`${cfg.url}/auth/v1/token?grant_type=refresh_token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "apikey": cfg.anonKey },
+        body: JSON.stringify({ refresh_token: sess.refresh_token })
+      });
+      if (!res.ok) return null;
+      const refreshed = await res.json();
+      if (refreshed && refreshed.access_token) {
+        const mergedSess = { ...sess, ...refreshed };
+        saveSupabaseSession(mergedSess);
+        return mergedSess;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  async function syncNowWithSupabase(pullFirst = false, didRetryAuth = false) {
     const cfg = getSupabaseConfig();
-    const sess = getSupabaseSession();
+    let sess = getSupabaseSession();
     if (!cfg || !cfg.url || !cfg.anonKey || !sess || !sess.access_token || !sess.user) {
       return { ok: false, error: "Не выполнен вход в аккаунт", count: 0 };
     }
@@ -1401,6 +1420,14 @@
         const lRes = await fetch(`${cfg.url}/rest/v1/workout_logs?user_id=eq.${encodeURIComponent(sess.user.id)}&order=created_at.asc`, { headers });
         if (!lRes.ok) {
           const errTxt = await lRes.text();
+          if ((lRes.status === 401 || errTxt.toLowerCase().includes("jwt expired")) && !didRetryAuth) {
+            const refreshedSess = await refreshSupabaseSessionIfNeeded(cfg, sess);
+            if (refreshedSess) {
+              return await syncNowWithSupabase(pullFirst, true);
+            }
+            saveSupabaseSession(null);
+            return { ok: false, error: "Сессия истекла — войдите по Email и паролю заново", count: 0 };
+          }
           return { ok: false, error: `Чтение БД (${lRes.status}): ${errTxt.slice(0, 80)}`, count: 0 };
         }
         const rRows = await lRes.json();
