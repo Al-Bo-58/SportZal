@@ -1133,6 +1133,60 @@
     localStorage.setItem(storageKey("pending_del_uids"), JSON.stringify(Array.from(setObj)));
   }
 
+  function loadPendingDeleteSemKeys() {
+    try {
+      const arr = JSON.parse(localStorage.getItem(storageKey("pending_del_sem")) || "[]");
+      return new Set(Array.isArray(arr) ? arr : []);
+    } catch {
+      return new Set();
+    }
+  }
+
+  function savePendingDeleteSemKeys(setObj) {
+    localStorage.setItem(storageKey("pending_del_sem"), JSON.stringify(Array.from(setObj)));
+  }
+
+  async function deleteRowInSupabaseNow(targetItem, didRetry = false) {
+    const cfg = getSupabaseConfig();
+    let sess = getSupabaseSession();
+    if (!cfg || !cfg.url || !cfg.anonKey || !sess || !sess.access_token || !sess.user || !targetItem) {
+      return false;
+    }
+    const headers = {
+      "Content-Type": "application/json",
+      "apikey": cfg.anonKey,
+      "Authorization": `Bearer ${sess.access_token}`
+    };
+    try {
+      // Delete by uid AND by semantic fields (date + exercise + set_num + weight + reps) so any duplicate row is also removed
+      const urlByUid = `${cfg.url}/rest/v1/workout_logs?uid=eq.${encodeURIComponent(targetItem.uid)}&user_id=eq.${encodeURIComponent(sess.user.id)}`;
+      const res1 = await fetch(urlByUid, { method: "DELETE", headers });
+      if (!res1.ok) {
+        const errTxt = await res1.text();
+        if ((res1.status === 401 || errTxt.toLowerCase().includes("jwt expired")) && !didRetry) {
+          const refreshed = await refreshSupabaseSessionIfNeeded(cfg, sess);
+          if (refreshed) return await deleteRowInSupabaseNow(targetItem, true);
+        }
+        return false;
+      }
+
+      const urlByFields = `${cfg.url}/rest/v1/workout_logs?user_id=eq.${encodeURIComponent(sess.user.id)}&date=eq.${encodeURIComponent(targetItem.date)}&exercise=eq.${encodeURIComponent(targetItem.exercise)}&set_num=eq.${encodeURIComponent(Number(targetItem.set) || 1)}&weight=eq.${encodeURIComponent(Number(targetItem.weight) || 0)}&reps=eq.${encodeURIComponent(Number(targetItem.reps) || 0)}`;
+      const res2 = await fetch(urlByFields, { method: "DELETE", headers });
+      if (res2.ok) {
+        const uSet = loadPendingDeleteUids();
+        uSet.delete(targetItem.uid);
+        savePendingDeleteUids(uSet);
+        sbPendingDeleteUids.delete(targetItem.uid);
+
+        const sSet = loadPendingDeleteSemKeys();
+        sSet.delete(buildSemanticLogKey(targetItem));
+        savePendingDeleteSemKeys(sSet);
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
   function getSupabaseConfig() {
     try {
       const stored = JSON.parse(localStorage.getItem(SB_CONFIG_KEY) || "null");
@@ -1419,16 +1473,59 @@
 
     try {
       const allDelUids = new Set([...sbPendingDeleteUids, ...loadPendingDeleteUids()]);
+      const remainingDelUids = new Set();
       if (allDelUids.size > 0) {
-        const uidsToDel = Array.from(allDelUids);
-        sbPendingDeleteUids.clear();
-        savePendingDeleteUids(new Set());
-        for (const uid of uidsToDel) {
-          await fetch(`${cfg.url}/rest/v1/workout_logs?uid=eq.${encodeURIComponent(uid)}&user_id=eq.${encodeURIComponent(sess.user.id)}`, {
+        for (const uid of allDelUids) {
+          const dRes = await fetch(`${cfg.url}/rest/v1/workout_logs?uid=eq.${encodeURIComponent(uid)}&user_id=eq.${encodeURIComponent(sess.user.id)}`, {
             method: "DELETE",
             headers
           });
+          if (!dRes.ok) {
+            const errTxt = await dRes.text();
+            if ((dRes.status === 401 || errTxt.toLowerCase().includes("jwt expired")) && !didRetryAuth) {
+              const refreshedSess = await refreshSupabaseSessionIfNeeded(cfg, sess);
+              if (refreshedSess) {
+                return await syncNowWithSupabase(pullFirst, true, replaceRemoteLogs);
+              }
+              saveSupabaseSession(null);
+              return { ok: false, error: "Сессия истекла — войдите по Email и паролю заново", count: 0 };
+            }
+            remainingDelUids.add(uid);
+          }
         }
+        sbPendingDeleteUids = new Set(remainingDelUids);
+        savePendingDeleteUids(remainingDelUids);
+      }
+
+      const allDelSem = loadPendingDeleteSemKeys();
+      const remainingDelSem = new Set();
+      if (allDelSem.size > 0) {
+        for (const sk of allDelSem) {
+          const parts = sk.split("|");
+          if (parts.length >= 6) {
+            const [sDate, , sEx, sSet, sWeight, sReps] = parts;
+            // Fetch matching rows for this user & date to delete case-insensitively by semantic key
+            const qRes = await fetch(`${cfg.url}/rest/v1/workout_logs?user_id=eq.${encodeURIComponent(sess.user.id)}&date=eq.${encodeURIComponent(sDate)}&set_num=eq.${encodeURIComponent(sSet)}&weight=eq.${encodeURIComponent(sWeight)}&reps=eq.${encodeURIComponent(sReps)}&select=uid,workout,exercise,date,set_num,weight,reps`, { headers });
+            if (qRes.ok) {
+              const candidates = await qRes.json();
+              let allMatchedDeleted = true;
+              for (const c of (Array.isArray(candidates) ? candidates : [])) {
+                const cKey = buildSemanticLogKey({ date: c.date, workout: c.workout, exercise: c.exercise, set: c.set_num, weight: c.weight, reps: c.reps });
+                if (cKey === sk) {
+                  const delMatch = await fetch(`${cfg.url}/rest/v1/workout_logs?uid=eq.${encodeURIComponent(c.uid)}&user_id=eq.${encodeURIComponent(sess.user.id)}`, {
+                    method: "DELETE",
+                    headers
+                  });
+                  if (!delMatch.ok) allMatchedDeleted = false;
+                }
+              }
+              if (!allMatchedDeleted) remainingDelSem.add(sk);
+            } else {
+              remainingDelSem.add(sk);
+            }
+          }
+        }
+        savePendingDeleteSemKeys(remainingDelSem);
       }
 
       if (pullFirst) {
@@ -1457,9 +1554,12 @@
         const mergedMap = new Map();
 
         const ignoredDeleted = new Set([...sbPendingDeleteUids, ...loadPendingDeleteUids()]);
+        const ignoredSem = loadPendingDeleteSemKeys();
         if (Array.isArray(rRows)) {
           rRows.forEach(r => {
             if (ignoredDeleted.has(r.uid)) return;
+            const rSem = buildSemanticLogKey({ date: r.date, workout: r.workout, exercise: r.exercise, set: r.set_num, weight: r.weight, reps: r.reps });
+            if (ignoredSem.has(rSem)) return;
             mergedMap.set(r.uid, {
               uid: r.uid,
               date: r.date,
@@ -2703,7 +2803,16 @@
     render();
     showToast("Запись удалена");
 
+    const semSet = loadPendingDeleteSemKeys();
+    semSet.add(buildSemanticLogKey(target));
+    savePendingDeleteSemKeys(semSet);
+
     scheduleSupabaseSync([uid]);
+    deleteRowInSupabaseNow(target).then(ok => {
+      if (ok) {
+        showToast("Запись удалена из облака");
+      }
+    });
 
     if (currentUser.hasCloud) {
       clearTimeout(deleteCloudDebounceTimer);
